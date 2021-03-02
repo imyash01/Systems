@@ -4,11 +4,13 @@
 
 int main (int argc, char* argv[] ) {
 
-    int fileName = open(argv[2], O_RDONLY);
+    int fd = open(argv[2], O_RDONLY);
 
-    if(fileName == -1) {
+    if(fd == -1) {
         return EXIT_FAILURE;
     }
 
-    
+
+
+    return 0;
 }

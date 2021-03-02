@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS=-Wall -Werror -fsanitize=address
 
 all:
-	$(CC) $(CFLAGS) wordwrap.c -o wordwrap
+	$(CC) $(CFLAGS) ww.c -o ww
 
 clean:
 	rm -rf wordwrap

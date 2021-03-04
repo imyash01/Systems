@@ -6,6 +6,15 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+int wrap(int width, int input_fd, int output_fd){
+    //wrap does the reading from a file or stdin and the writing to either a file or stdout
+    char *readData = (char*) calloc(100, sizeof(char)); //don't attempt to read entire file in read
+    int currentLength = 0;
+    int tempLength = 0;
+    while(read(input_fd,readData,100) != 0){
+        
+    }
+}
 
 int main (int argc, char* argv[] ) {
 
@@ -15,8 +24,7 @@ int main (int argc, char* argv[] ) {
         return EXIT_FAILURE;
     }
     
-    char *readData = (char*) calloc(100, sizeof(char)); //don't attempt to read entire file in read
-    
+    //need to check if the argument given is a file or a directory
 
     // 3 scenarios
     if(fd == 0) { // input is from std input

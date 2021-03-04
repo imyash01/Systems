@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -8,11 +9,13 @@
 
 int wrap(int width, int input_fd, int output_fd){
     //wrap does the reading from a file or stdin and the writing to either a file or stdout
-    char *readData = (char*) calloc(100, sizeof(char)); //don't attempt to read entire file in read
+    char *read_buff = (char*) calloc(100, sizeof(char)); //don't attempt to read entire file in read
+
     int currentLength = 0;
-    int tempLength = 0;
-    while(read(input_fd,readData,100) != 0){
-        
+    int wordLength = 0;
+    //read util there is nothing to read
+    while(read(input_fd,read_buff,100) != 0){
+        //go through the buffer then check we have a word if it is a word write it.
     }
 }
 

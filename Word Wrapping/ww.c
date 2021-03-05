@@ -58,7 +58,11 @@ int sb_append(strbuf_t *L, char letter)
 
 int wrap(int width, int input_fd, int output_fd){
     //wrap does the reading from a file or stdin and the writing to either a file or stdout
-    char *read_buff = (char*) calloc(SIZE, sizeof(char)); //don't attempt to read entire file in read
+    char *read_buff;
+    
+    read_buff = (char*) calloc(SIZE, sizeof(char)); //don't attempt to read entire file in read
+
+    char newline [2] = "\n";
 
     strbuf_t word;
 
@@ -66,7 +70,7 @@ int wrap(int width, int input_fd, int output_fd){
     int newWord = 1;
     //read until there is nothing to read
     while(read(input_fd,read_buff,SIZE) != 0){
-        for(int i = 0; i < SIZE; i++){
+        for(int i = 0; i < SIZE; i++){ //make a while loop until '\n'
             char curr = read_buff[i];
 
             //checks if curr is a space if is it it gets written and destroyed otherwise appended to the word.
@@ -78,17 +82,18 @@ int wrap(int width, int input_fd, int output_fd){
             else{
                 if(word.used - 1 > width){
                     write(output_fd,word.data,word.used);
-                    sb_destroy(&word);
+                    sb_destroy(&word); // reset the values
                     return EXIT_FAILURE;
                 }
                 currLength += word.used-1;
-                if(currLength > width || (curr == '\n' && currLength == 0)){ //check this for blank lines it adds a \n after a line
-                    write(output_fd,'\n',1);
+                if((curr == '\n' && currLength == 0) || currLength > width){ //check this for blank lines it adds a \n after a line
+                    write(output_fd,newline,1); //append new line and destroy
                     currLength = 0;
                 }
-                else{
-                    write(output_fd,word.data,word.used);
-                    sb_destroy(&word);
+                else if (currLength > 0){
+                    //if(curr == \n) then add word and append a newline
+                    write(output_fd,word.data,word.used-1); // append a space after each word
+                    sb_destroy(&word); // reset the values just to be safe
                     newWord = 1;
                 }
             }

@@ -82,8 +82,9 @@ int wrap(int width, int input_fd, int output_fd){
                     return EXIT_FAILURE;
                 }
                 currLength += word.used-1;
-                if(currLength == 0 || currLength > width){ //check this for blank lines it adds a \n after a line
+                if(currLength > width || (curr == '\n' && currLength == 0)){ //check this for blank lines it adds a \n after a line
                     write(output_fd,'\n',1);
+                    currLength = 0;
                 }
                 else{
                     write(output_fd,word.data,word.used);

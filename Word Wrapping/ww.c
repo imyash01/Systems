@@ -67,11 +67,11 @@ int wrap(int width, int input_fd, int output_fd){
     //read until there is nothing to read
     while(read(input_fd,read_buff,SIZE) != 0){
         for(int i = 0; i < SIZE; i++){
-            if(newWord) sb_init(&word,32);
             char curr = read_buff[i];
 
             //checks if curr is a space if is it it gets written and destroyed otherwise appended to the word.
             if(!isspace(curr)){
+                if(newWord) sb_init(&word,32);
                 sb_append(&word, curr);
                 newWord = 0;
             }
@@ -88,19 +88,25 @@ int wrap(int width, int input_fd, int output_fd){
                 else{
                     write(output_fd,word.data,word.used);
                     sb_destroy(&word);
+                    newWord = 1;
                 }
             }
         }
     }
+    return 0;
 }
 
 int main (int argc, char* argv[] ) {
+
+    if(argv[1] < 1) return EXIT_FAILURE;
 
     int fd = open(argv[2], O_RDONLY);
 
     if(fd == -1) {
         return EXIT_FAILURE;
     }
+
+    
     
     //need to check if the argument given is a file or a directory
 

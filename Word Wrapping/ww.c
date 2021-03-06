@@ -64,18 +64,24 @@ int wrap(int width, int input_fd, int output_fd){
 
     char newline [2] = "\n";
 
+    char space[2] = " ";
+
     strbuf_t word;
 
     int currLength = 0;
-    int newWord = 1;
+    int newWord = 1; //bool to check if its a new word
+    int firstWord = 1;
     //read until there is nothing to read
     while(read(input_fd,read_buff,SIZE) != 0){
         for(int i = 0; i < SIZE; i++){ //make a while loop until '\n'
+            //if(read_buff[i] == 0) continue;
             char curr = read_buff[i];
 
             //checks if curr is a space if is it it gets written and destroyed otherwise appended to the word.
             if(!isspace(curr)){
-                if(newWord) sb_init(&word,32);
+                if(newWord) 
+                    sb_init(&word,32);
+
                 sb_append(&word, curr);
                 newWord = 0;
             }
@@ -86,15 +92,25 @@ int wrap(int width, int input_fd, int output_fd){
                     return EXIT_FAILURE;
                 }
                 currLength += word.used-1;
-                if((curr == '\n' && currLength == 0) || currLength > width){ //check this for blank lines it adds a \n after a line
-                    write(output_fd,newline,1); //append new line and destroy
-                    currLength = 0;
-                }
-                else if (currLength > 0){
-                    //if(curr == \n) then add word and append a newline
-                    write(output_fd,word.data,word.used-1); // append a space after each word
+                if (currLength < width){
+                    if(!firstWord)
+                        write(output_fd,space,1);
+
+                    write(output_fd,word.data,word.used-1);
                     sb_destroy(&word); // reset the values just to be safe
                     newWord = 1;
+                    firstWord = 0;
+                }
+                else if(currLength > width || (curr == '\n' && read_buff[i-1] == '\n')){ //check this for blank lines, paragraph or it goes over width it adds a \n after a line
+                    if(read_buff[i-1] == '\n'){
+                        write(output_fd,newline,1);
+                    }
+                    write(output_fd,newline,1); //append new line and destroy
+                    
+                    write(output_fd,word.data,word.used-1);
+                    sb_destroy(&word); // reset the values just to be safe
+                    newWord = 1;
+                    currLength = word.used-1;
                 }
             }
         }

@@ -62,23 +62,24 @@ int wrap(int width, int input_fd, int output_fd){
     
     read_buff = (char*) calloc(SIZE, sizeof(char)); //don't attempt to read entire file in read
 
-    char newline [2] = "\n";
-
-    char space[2] = " ";
-
     strbuf_t word;
+
+    char prev[2] = " ";
 
     int currLength = 0;
     int newWord = 1; //bool to check if its a new word
-    int firstWord = 1;
+    int firstWord = 1;// bool to check if its the first word
+    int nRead = 0;
     //read until there is nothing to read
     while(read(input_fd,read_buff,SIZE) != 0){
         for(int i = 0; i < SIZE; i++){ //make a while loop until '\n'
-            //if(read_buff[i] == 0) continue;
             char curr = read_buff[i];
 
+            if(read_buff[i-1] == 0 && read_buff[i] == 0)
+                break; 
+
             //checks if curr is a space if is it it gets written and destroyed otherwise appended to the word.
-            if(!isspace(curr)){
+            if(!isspace(curr) && curr != '\0'){
                 if(newWord) 
                     sb_init(&word,32);
 
@@ -92,27 +93,35 @@ int wrap(int width, int input_fd, int output_fd){
                     return EXIT_FAILURE;
                 }
                 currLength += word.used-1;
-                if (currLength < width){
-                    if(!firstWord)
-                        write(output_fd,space,1);
+                
+                if(currLength > width){ //check this for blank lines, paragraph or it goes over width it adds a \n after a line
+                        
+                        write(output_fd,"\n",1); //append new line and destroy
+                    
+                        write(output_fd,word.data,word.used-1);
+                        sb_destroy(&word); // reset the values just to be safe
+                        newWord = 1;
+                        currLength = word.used-1;
+                    
+                }
+                else if(prev[0] == '\n' && curr == '\n'){
+                    write(output_fd,"\n",1); //append new line
+                    write(output_fd,"\n",1); //append new line
+                    firstWord = 1;
+                }
+                else{
+                    if(!firstWord){
+                        write(output_fd," ",1);
+                        currLength++;
+                    }
 
                     write(output_fd,word.data,word.used-1);
                     sb_destroy(&word); // reset the values just to be safe
                     newWord = 1;
                     firstWord = 0;
                 }
-                else if(currLength > width || (curr == '\n' && read_buff[i-1] == '\n')){ //check this for blank lines, paragraph or it goes over width it adds a \n after a line
-                    if(read_buff[i-1] == '\n'){
-                        write(output_fd,newline,1);
-                    }
-                    write(output_fd,newline,1); //append new line and destroy
-                    
-                    write(output_fd,word.data,word.used-1);
-                    sb_destroy(&word); // reset the values just to be safe
-                    newWord = 1;
-                    currLength = word.used-1;
-                }
             }
+            prev[0] = curr;
         }
     }
     return 0;

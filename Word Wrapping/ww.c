@@ -157,6 +157,7 @@ int main (int argc, char* argv[] ) {
 
     if(argc == 2) {
          wrap(0, width, 1);  // scneario 1: read from STDIN and print in STDOUT
+         return EXIT_SUCCESS;
     }
 
     
@@ -175,6 +176,7 @@ int main (int argc, char* argv[] ) {
     int check = isdir(argv[2]);
     if(check == 1) {
         wrap(fd, width, 1); //the second argument is a file, read from file and then display in std output : scenario 2
+        return EXIT_SUCCESS;
     } 
     
     DIR *dirp = opendir(argv[2]);  // open the current directory

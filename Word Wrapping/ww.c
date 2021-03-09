@@ -153,26 +153,29 @@ int main (int argc, char* argv[] ) {
 
     if(argv[1] < 1) return EXIT_FAILURE;
 
-    int fd = open(argv[2], O_RDONLY);
+    int width = atoi(argv[1]);
 
+    if(argc == 2) {
+         wrap(0, width, 1);  // scneario 1: read from STDIN and print in STDOUT
+    }
+
+    
+    int fd = open(argv[2], O_RDONLY);
+    
     if(fd == -1) {
         return EXIT_FAILURE;
     }
-
-    int width = atoi(argv[1]);
     
     
-    //need to check if the argument given is a file, std input or a directory
-    // 3 scenarios
-    if(fd == 0) { // input is from std input : scenario 1
-        wrap(0, width, 1);
-    } 
+    //need to check if the argument given is a file or a directory
+    // 2 scenarios
+    
      
     //check to see if second argument is directory or file
     int check = isdir(argv[2]);
     if(check == 1) {
-        wrap(1, width, 1); //the second argument is a file, read from file and then display in std output
-    } //not too sure on 1st argument, FIX THIS LATER
+        wrap(fd, width, 1); //the second argument is a file, read from file and then display in std output : scenario 2
+    } 
     
     DIR *dirp = opendir(argv[2]);  // open the current directory
     struct dirent *de;

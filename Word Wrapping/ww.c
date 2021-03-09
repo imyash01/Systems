@@ -91,40 +91,48 @@ int wrap(int width, int input_fd, int output_fd){
                 if(word.used - 1 > width){
                     write(output_fd,word.data,word.used);
                     sb_destroy(&word); // reset the values
-                    return EXIT_FAILURE;
+                    return EXIT_FAILURE; //idk if we continue
                 }
-                currLength += word.used-1;
+                currLength += word.used;
                 
                 if(currLength > width){ //check this for blank lines, paragraph or it goes over width it adds a \n after a line
                         
                         write(output_fd,"\n",1); //append new line and destroy
                     
                         write(output_fd,word.data,word.used-1);
-                        sb_destroy(&word); // reset the values just to be safe
+                        sb_destroy(&word);
                         newWord = 1;
                         currLength = word.used-1;
+                        word.used = 1;
                     
                 }
                 else if(prev[0] == '\n' && curr == '\n'){
                     write(output_fd,"\n",1); //append new line
                     write(output_fd,"\n",1); //append new line
                     firstWord = 1;
+                    currLength = 0;
                 }
-                else{
+                else if(word.used > 1){
                     if(!firstWord){
                         write(output_fd," ",1);
-                        currLength++;
                     }
 
                     write(output_fd,word.data,word.used-1);
-                    sb_destroy(&word); // reset the values just to be safe
+                    sb_destroy(&word);
+                    word.used = 1;
                     newWord = 1;
                     firstWord = 0;
+                }
+                else{
+                    currLength--;
                 }
             }
             prev[0] = curr;
         }
+        free(read_buff);
+        read_buff = (char*) calloc(SIZE, sizeof(char));
     }
+    free(read_buff);
     return 0;
 }
 

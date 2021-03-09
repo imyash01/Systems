@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -127,6 +128,27 @@ int wrap(int width, int input_fd, int output_fd){
     return 0;
 }
 
+int isdir(char *name) {
+	struct stat data;
+	
+	int err = stat(name, &data);
+	
+	// should confirm err == 0
+	if (err) {
+		perror(name);  // print error message
+		return 0;
+	}
+	
+	if (S_ISDIR(data.st_mode)) {
+		// S_ISDIR macro is true if the st_mode says the file is a directory
+		// S_ISREG macro is true if the st_mode says the file is a regular file
+
+		return 1;
+	} 
+	
+	return 0;
+}
+
 int main (int argc, char* argv[] ) {
 
     if(argv[1] < 1) return EXIT_FAILURE;
@@ -137,20 +159,37 @@ int main (int argc, char* argv[] ) {
         return EXIT_FAILURE;
     }
 
+    int width = atoi(argv[1]);
     
     
-    //need to check if the argument given is a file or a directory
-
+    //need to check if the argument given is a file, std input or a directory
     // 3 scenarios
-    if(fd == 0) { // input is from std input
+    if(fd == 0) { // input is from std input : scenario 1
+        wrap(0, width, 1);
+    } 
+     
+    //check to see if second argument is directory or file
+    int check = isdir(argv[2]);
+    if(check == 1) {
+        wrap(1, width, 1); //the second argument is a file, read from file and then display in std output
+    } //not too sure on 1st argument, FIX THIS LATER
+    
+    DIR *dirp = opendir(argv[2]);  // open the current directory
+    struct dirent *de;
 
-    } else if (fd == 1) { //input is from file
-        
-    } else if (fd == 2) { //file name is a directory
-
-    } else {
-        return EXIT_FAILURE;
+    while ((de = readdir(dirp))) {
+        //puts(de->d_name);
+        printf("%lu %d %s\n",
+            de->d_ino,
+            de->d_type,
+            de->d_name);
     }
 
+    closedir(dirp); // should check for failure
+    return EXIT_SUCCESS;
+
+    //now need to manipulate files in directory 
+    
+    
     return 0;
 }

@@ -192,10 +192,24 @@ int main (int argc, char* argv[] ) {
 
     while ((de = readdir(dirp))) {
         //puts(de->d_name);
-        printf("%lu %d %s\n",
-            de->d_ino,
-            de->d_type,
-            de->d_name);
+            de->d_name;
+
+
+        if(strcmp(de, "wrap" == 0)) {
+            continue;
+        }
+        char *addslash = "./";
+        char *directory = strcat(addslash, de);
+        
+        int check2 = isdir(directory);
+
+        if(check2 == 1) { //this means we have a file 
+            int fd2 = open(de, O_RDONLY);
+            //create a new file
+            
+        } else if (check2 == 0) { //this means we have a directory and we just skip
+            continue;
+        }
     }
 
     closedir(dirp); // should check for failure

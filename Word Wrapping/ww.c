@@ -70,14 +70,16 @@ int wrap(int width, int input_fd, int output_fd){
     int currLength = 0;
     int newWord = 1; //bool to check if its a new word
     int firstWord = 1;// bool to check if its the first word
-    int nRead = 0;
+    //int nRead = 0;
     //read until there is nothing to read
     while(read(input_fd,read_buff,SIZE) != 0){
         for(int i = 0; i < SIZE; i++){ //make a while loop until '\n'
             char curr = read_buff[i];
 
-            if(i > 0 && (read_buff[i-1] == 0 && read_buff[i] == 0))
-                break; 
+            if(i > 0 && (read_buff[i-1] == 0 && read_buff[i] == 0)){
+                write(output_fd,"\n",1);
+                break;
+            } 
 
             //checks if curr is a space if is it it gets written and destroyed otherwise appended to the word.
             if(!isspace(curr) && curr != '\0'){

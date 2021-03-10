@@ -194,20 +194,38 @@ int main (int argc, char* argv[] ) {
 
     while ((de = readdir(dirp))) {
         //puts(de->d_name);
-            de->d_name;
+           //de->d_name;
 
 
-        if(strcmp(de, "wrap" == 0)) {
+        if(strcmp(de, "wrap" == 0)) { // have a for loop that checks first 5 letters
             continue;
         }
-        char *addslash = "./";
-        char *directory = strcat(addslash, de);
+        char *directory = "./";
+        strcat(directory, de->d_name);
         
         int check2 = isdir(directory);
 
+        // if file starts with wrap, skip over - ASK ABOUT THIS
+        if(de->d_name[0] == 'w' && de->d_name[1] == 'r' && de->d_name[2] == 'i' && de->d_name[3] == 't' && de->d_name[4] == 'e') {
+            continue;
+        }
+        //if file starts with . - idk need to ask about this
+
         if(check2 == 1) { //this means we have a file 
-            int fd2 = open(de, O_RDONLY);
+            char* temp1 = "./";
+            strcat(temp1, argv[2]);
+            int fd2 = open(temp1, O_RDONLY);
+
             //create a new file
+            char* temp2 = "./";
+            strcat(temp2, argv[2]);
+            char* temp3 = "/wrap.";
+            strcat(temp3, de->d_name);
+            strcat(temp2, temp3);
+
+            //now write file, create the file
+            int fd3 = open(temp2, O_WRONLY|O_CREAT|O_APPEND);
+            wrap(fd2, width, fd3);
             
         } else if (check2 == 0) { //this means we have a directory and we just skip
             continue;
@@ -216,8 +234,6 @@ int main (int argc, char* argv[] ) {
 
     closedir(dirp); // should check for failure
     return EXIT_SUCCESS;
-
-    //now need to manipulate files in directory 
     
     
     return 0;

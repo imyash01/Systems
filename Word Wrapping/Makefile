@@ -5,4 +5,4 @@ all:
 	$(CC) $(CFLAGS) ww.c -o ww
 
 clean:
-	rm -rf wordwrap
+	rm -rf ww

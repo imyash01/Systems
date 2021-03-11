@@ -67,7 +67,6 @@ int sb_concat(strbuf_t* list, char* str){
 }
 
 int wrap(int width, int input_fd, int output_fd){
-        //wrap does the reading from a file or stdin and the writing to either a file or stdout
     char *read_buff;
     
     read_buff = (char*) calloc(SIZE, sizeof(char)); //don't attempt to read entire file in read
@@ -80,7 +79,7 @@ int wrap(int width, int input_fd, int output_fd){
     int newWord = 1; //bool to check if its a new word
     int firstWord = 1;// bool to check if its the first word
     int error = 0;
-    //int nRead = 0;
+
     //read until there is nothing to read
     while(read(input_fd,read_buff,SIZE) != 0){
         for(int i = 0; i < SIZE; i++){ //make a while loop until '\n'
@@ -171,19 +170,16 @@ int isdir(char *name) {
 	
 	int err = stat(name, &data);
 	
-	// should confirm err == 0
-	if (err) {
+	if (err == -1) {
 		perror(name);  // print error message
 		return -1;
 	}
-	
+    // S_ISDIR macro is true if the st_mode says the file is a directory
+	// S_ISREG macro is true if the st_mode says the file is a regular file
 	if (S_ISDIR(data.st_mode)) {
-		// S_ISDIR macro is true if the st_mode says the file is a directory
-		// S_ISREG macro is true if the st_mode says the file is a regular file
-
 		return 1;
-
-	} else if (S_ISREG(data.st_mode)) {
+	} 
+    else if (S_ISREG(data.st_mode)) {
         return 0;
     } 
 	
@@ -192,24 +188,28 @@ int isdir(char *name) {
 
 int main (int argc, char* argv[] ) {
 
-   // if(argv[1] < 1) return EXIT_FAILURE;
+   if(argc < 2) return EXIT_FAILURE;
 
     int width = atoi(argv[1]);
 
-    if(argc == 2) {
-         wrap(width, 0, 1);  // scneario 1: read from STDIN and print in STDOUT
-         return EXIT_SUCCESS;
-    }
+    if(width < 1) return EXIT_FAILURE;
 
-    //need to check if the argument given is a file or a directory
-    // 2 scenarios
-    
+    int error = 0;
+
+    if(argc == 2) {
+         if(wrap(width, 0, 1))  // scneario 1: read from STDIN and print in STDOUT
+            return EXIT_FAILURE;
+         return EXIT_SUCCESS;
+    }    
      
     //check to see if second argument is directory or file
     int check = isdir(argv[2]);
     if(check == 0) {
         int fd = open(argv[2], O_RDONLY);
-        wrap(width, fd, 1); //the second argument is a file, read from file and then display in std output : scenario 2
+        if(wrap(width, fd, 1)){ //the second argument is a file, read from file and then display in std output : scenario 2
+            close(fd);
+            return EXIT_FAILURE;
+        }
         return EXIT_SUCCESS;
         close(fd);
     } 
@@ -220,14 +220,6 @@ int main (int argc, char* argv[] ) {
 
         while ((folder = readdir(dirp))) {
 
-            if(folder->d_name[0] == 'w' && folder->d_name[1] == 'r' && folder->d_name[2] == 'a' && folder->d_name[3] == 'p' && folder->d_name[4] == '.') {
-                    continue;
-            }
-            //if file starts with . - idk need to ask about this
-            if(folder->d_name[0] == '.') {
-                continue;
-            }
-
             strbuf_t path;
             sb_init(&path, 32);
             sb_concat(&path,argv[2]);
@@ -237,6 +229,16 @@ int main (int argc, char* argv[] ) {
             int check2 = isdir(path.data);
 
             if(!check2){
+
+                if(folder->d_name[0] == 'w' && folder->d_name[1] == 'r' && folder->d_name[2] == 'a' && folder->d_name[3] == 'p' && folder->d_name[4] == '.') {
+                    sb_destroy(&path);
+                    continue;
+                }
+                //if file starts with .
+                if(folder->d_name[0] == '.') {
+                    sb_destroy(&path);
+                    continue;
+                }
 
                 int fd2 = open(path.data, O_RDONLY);
 
@@ -249,28 +251,32 @@ int main (int argc, char* argv[] ) {
                 sb_concat(&out_path, folder->d_name);
 
                 //now write file, create the file
-                int fd3 = open(out_path.data, O_WRONLY|O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
-                wrap(width, fd2, fd3);
+                int fd3 = open(out_path.data, O_WRONLY|O_CREAT|O_TRUNC, 0600);
+                if(wrap(width, fd2, fd3))
+                    error = 1;
 
                 close(fd3);
                 close(fd2);
                 sb_destroy(&out_path);
                 sb_destroy(&path);
             }
-            else { //this means we have a directory and we just skip
+            else if(check2 == 1){ //this means we have a directory and we just skip
                 sb_destroy(&path);
                 continue;
             }
-                //add if check is -1
+            else{
+                error = 1;
+                sb_destroy(&path);
+                continue;
+            }
+            
         }
-        
-
         closedir(dirp); // should check for failure
-    
-    //close(fd);
     }
+    else{
+        return EXIT_FAILURE;
+    }
+    if(error)
+        return EXIT_FAILURE;
     return EXIT_SUCCESS;
-    
-    
-    return 0;
 }

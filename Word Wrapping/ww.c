@@ -76,7 +76,7 @@ int wrap(int width, int input_fd, int output_fd){
 
     char prev[2] = " ";
 
-    int currLength = 0;
+    int currLength = -1; //to remove the space for firstword in file
     int newWord = 1; //bool to check if its a new word
     int firstWord = 1;// bool to check if its the first word
     int error = 0;
@@ -87,7 +87,8 @@ int wrap(int width, int input_fd, int output_fd){
             char curr = read_buff[i];
 
             if(i > 0 && (read_buff[i-1] == 0 && read_buff[i] == 0)){
-                write(output_fd,"\n",1);
+                if(currLength > 0)
+                    write(output_fd,"\n",1);
                 break;
             } 
 
@@ -103,7 +104,7 @@ int wrap(int width, int input_fd, int output_fd){
 
                     if(word.used - 1 > width){
 
-                        if(currLength != 0)
+                        if(currLength >0)
                             write(output_fd,"\n",1);
 
                         write(output_fd,word.data,word.used-1);
@@ -113,11 +114,11 @@ int wrap(int width, int input_fd, int output_fd){
                         word.used = 1;
                         newWord = 1;
                         firstWord = 1;
-                        currLength = 0;
+                        currLength = -1; //removes space in first word of a paragraph
                         error = 1;
                     }
                     else{
-                        currLength += word.used;
+                        currLength += word.used; //adds the 1 for space
                     
                         if(currLength > width && word.used > 1){ //check this for blank lines, paragraph or it goes over width it adds a \n after a line
                                 write(output_fd,"\n",1); //append new line and destroy
@@ -133,7 +134,7 @@ int wrap(int width, int input_fd, int output_fd){
                             write(output_fd,"\n",1); //append new line
                             write(output_fd,"\n",1); //append new line
                             firstWord = 1;
-                            currLength = 0;
+                            currLength = -1; //removes space in first word of a paragraph
                         }
                         else if(word.used > 1){
                             if(!firstWord){

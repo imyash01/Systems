@@ -67,7 +67,7 @@ int sb_concat(strbuf_t* list, char* str){
 }
 
 int wrap(int width, int input_fd, int output_fd){
-    //wrap does the reading from a file or stdin and the writing to either a file or stdout
+        //wrap does the reading from a file or stdin and the writing to either a file or stdout
     char *read_buff;
     
     read_buff = (char*) calloc(SIZE, sizeof(char)); //don't attempt to read entire file in read
@@ -100,47 +100,57 @@ int wrap(int width, int input_fd, int output_fd){
                 newWord = 0;
             }
             else{
-                if(word.used - 1 > width){
-                    write(output_fd,word.data,word.used-1);
-                    write(output_fd,"\n",1);
-                    sb_destroy(&word); // reset the values
-                    firstWord = 1;
-                    currLength = 0;
-                    error = 1;
-                }
-                currLength += word.used;
-                
-                if(currLength > width){ //check this for blank lines, paragraph or it goes over width it adds a \n after a line
-                        
-                        write(output_fd,"\n",1); //append new line and destroy
-                    
+
+                    if(word.used - 1 > width){
+
+                        if(currLength != 0)
+                            write(output_fd,"\n",1);
+
                         write(output_fd,word.data,word.used-1);
-                        sb_destroy(&word);
-                        newWord = 1;
-                        currLength = word.used-1;
+                        write(output_fd,"\n",1);
+
+                        sb_destroy(&word); // reset the values
                         word.used = 1;
+                        newWord = 1;
+                        firstWord = 1;
+                        currLength = 0;
+                        error = 1;
+                    }
+                    else{
+                        currLength += word.used;
                     
-                }
-                else if(prev[0] == '\n' && curr == '\n'){
-                    write(output_fd,"\n",1); //append new line
-                    write(output_fd,"\n",1); //append new line
-                    firstWord = 1;
-                    currLength = 0;
-                }
-                else if(word.used > 1){
-                    if(!firstWord){
-                        write(output_fd," ",1);
+                        if(currLength > width && word.used > 1){ //check this for blank lines, paragraph or it goes over width it adds a \n after a line
+                                write(output_fd,"\n",1); //append new line and destroy
+                            
+                                write(output_fd,word.data,word.used-1);
+                                sb_destroy(&word);
+                                newWord = 1;
+                                currLength = word.used-1;
+                                word.used = 1;
+                            
+                        }
+                        else if(prev[0] == '\n' && curr == '\n'){
+                            write(output_fd,"\n",1); //append new line
+                            write(output_fd,"\n",1); //append new line
+                            firstWord = 1;
+                            currLength = 0;
+                        }
+                        else if(word.used > 1){
+                            if(!firstWord){
+                                write(output_fd," ",1);
+                            }
+
+                            write(output_fd,word.data,word.used-1);
+                            sb_destroy(&word);
+                            word.used = 1;
+                            newWord = 1;
+                            firstWord = 0;
+                        }
+                        else{
+                            currLength--;
+                        }
                     }
 
-                    write(output_fd,word.data,word.used-1);
-                    sb_destroy(&word);
-                    word.used = 1;
-                    newWord = 1;
-                    firstWord = 0;
-                }
-                else{
-                    currLength--;
-                }
             }
             prev[0] = curr;
         }

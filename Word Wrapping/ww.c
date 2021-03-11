@@ -8,9 +8,7 @@
 #include <unistd.h>
 #include <dirent.h>
 
-#ifndef DEBUG
-#define DEBUG 0
-#endif
+
 #define SIZE 128
 
 typedef struct {
@@ -47,13 +45,24 @@ int sb_append(strbuf_t *L, char letter)
 	L->data = p;
 	L->length = size;
 
-	if (DEBUG) printf("Increased size to %lu\n", size);
+	//if (deBUG) printf("Increased size to %lu\n", size);
     }
 
     L->data[L->used-1] = letter;
     L->data[L->used] = '\0';
     ++L->used;
 
+    return 0;
+}
+
+int sb_concat(strbuf_t* list, char* str){
+    int i = 0;
+    while(str[i] != '\0'){
+        if(sb_append(list, str[i])){
+            return 1;
+        }
+        i++;
+    }
     return 0;
 }
 
@@ -70,6 +79,7 @@ int wrap(int width, int input_fd, int output_fd){
     int currLength = 0;
     int newWord = 1; //bool to check if its a new word
     int firstWord = 1;// bool to check if its the first word
+    int error = 0;
     //int nRead = 0;
     //read until there is nothing to read
     while(read(input_fd,read_buff,SIZE) != 0){
@@ -91,9 +101,12 @@ int wrap(int width, int input_fd, int output_fd){
             }
             else{
                 if(word.used - 1 > width){
-                    write(output_fd,word.data,word.used);
+                    write(output_fd,word.data,word.used-1);
+                    write(output_fd,"\n",1);
                     sb_destroy(&word); // reset the values
-                    return EXIT_FAILURE; //idk if we continue
+                    firstWord = 1;
+                    currLength = 0;
+                    error = 1;
                 }
                 currLength += word.used;
                 
@@ -135,7 +148,11 @@ int wrap(int width, int input_fd, int output_fd){
         read_buff = (char*) calloc(SIZE, sizeof(char));
     }
     free(read_buff);
-    return 0;
+    
+    if(error)
+        return 1;
+    else
+        return 0;
 }
 
 int isdir(char *name) {
@@ -169,7 +186,7 @@ int main (int argc, char* argv[] ) {
     int width = atoi(argv[1]);
 
     if(argc == 2) {
-         wrap(0, width, 1);  // scneario 1: read from STDIN and print in STDOUT
+         wrap(width, 0, 1);  // scneario 1: read from STDIN and print in STDOUT
          return EXIT_SUCCESS;
     }
 
@@ -184,59 +201,60 @@ int main (int argc, char* argv[] ) {
         wrap(width, fd, 1); //the second argument is a file, read from file and then display in std output : scenario 2
         return EXIT_SUCCESS;
         close(fd);
-    } else if(check == 1) { 
-    
+    } 
+    else if(check == 1) { 
+
         DIR *dirp = opendir(argv[2]);  // open the current directory
-        struct dirent *de;
+        struct dirent *folder;
 
-        while ((de = readdir(dirp))) {
-            //puts(de->d_name);
-            //de->d_name;
+        while ((folder = readdir(dirp))) {
 
-
-            //if(strcmp(de->d_name, "wrap" == 0)) { // have a for loop that checks first 5 letters
-            //  continue;
-            //}
-            char *directory = "./";
-            strcat(directory, de->d_name);
-            
-            int check2 = isdir(directory);
-
-            // if file starts with wrap, skip over - ASK ABOUT THIS
-            if(de->d_name[0] == 'w' && de->d_name[1] == 'r' && de->d_name[2] == 'a' && de->d_name[3] == 'p' && de->d_name[4] == '.') {
-                continue;
+            if(folder->d_name[0] == 'w' && folder->d_name[1] == 'r' && folder->d_name[2] == 'a' && folder->d_name[3] == 'p' && folder->d_name[4] == '.') {
+                    continue;
             }
             //if file starts with . - idk need to ask about this
-            if(de->d_name[0] == '.') {
+            if(folder->d_name[0] == '.') {
                 continue;
             }
 
-            if(check2 == 0) { //this means we have a file 
-                char* temp1 = "./";
-                strcat(temp1, argv[2]);
-                int fd2 = open(temp1, O_RDONLY);
+            strbuf_t path;
+            sb_init(&path, 32);
+            sb_concat(&path,argv[2]);
+            sb_append(&path,'/');
+            sb_concat(&path,folder->d_name);
+            
+            int check2 = isdir(path.data);
+
+            if(!check2){
+
+                int fd2 = open(path.data, O_RDONLY);
 
                 //create a new file
-                char* temp2 = "./";
-                strcat(temp2, argv[2]);
-                char* temp3 = "wrap.";
-                strcat(temp3, de->d_name);
-                strcat(temp2, temp3);
+                strbuf_t out_path;
+                sb_init(&out_path, 32);
+                sb_concat(&out_path,argv[2]);
+                sb_append(&out_path,'/');
+                sb_concat(&out_path,"wrap.");
+                sb_concat(&out_path, folder->d_name);
 
                 //now write file, create the file
-                int fd3 = open(temp2, O_WRONLY|O_CREAT|O_APPEND);
-                wrap(fd2, width, fd3);
+                int fd3 = open(out_path.data, O_WRONLY|O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+                wrap(width, fd2, fd3);
 
                 close(fd3);
                 close(fd2);
-                
-            } else if (check2 == 1) { //this means we have a directory and we just skip
+                sb_destroy(&out_path);
+                sb_destroy(&path);
+            }
+            else { //this means we have a directory and we just skip
+                sb_destroy(&path);
                 continue;
             }
+                //add if check is -1
         }
         
 
-    closedir(dirp); // should check for failure
+        closedir(dirp); // should check for failure
     
     //close(fd);
     }

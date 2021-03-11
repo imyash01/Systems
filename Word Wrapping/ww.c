@@ -160,9 +160,9 @@ int wrap(int width, int input_fd, int output_fd){
     free(read_buff);
     
     if(error)
-        return 1;
+        return EXIT_FAILURE;
     else
-        return 0;
+        return EXIT_SUCCESS;
 }
 
 int isdir(char *name) {

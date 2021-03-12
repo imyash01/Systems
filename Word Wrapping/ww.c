@@ -103,17 +103,15 @@ int wrap(int width, int input_fd, int output_fd){
 
                     if(word.used - 1 > width){
 
-                        if(currLength >0)
+                        if(currLength > 0)
                             write(output_fd,"\n",1);
 
                         write(output_fd,word.data,word.used-1);
-                        write(output_fd,"\n",1);
 
                         sb_destroy(&word); // reset the values
-                        word.used = 1;
                         newWord = 1;
-                        firstWord = 1;
-                        currLength = -1; //removes space in first word of a paragraph
+                        currLength += word.used-1; //add to curr length so other word starts with a new line
+                        word.used = 1; //reset values
                         error = 1;
                     }
                     else{
@@ -127,9 +125,10 @@ int wrap(int width, int input_fd, int output_fd){
                                 newWord = 1;
                                 currLength = word.used-1;
                                 word.used = 1;
+                                firstWord = 0;
                             
                         }
-                        else if(prev[0] == '\n' && curr == '\n'){
+                        else if((prev[0] == '\n' && curr == '\n') && currLength > 0){ //paragraph has 1 or more words so currLength has to be > 0
                             write(output_fd,"\n",1); //append new line
                             write(output_fd,"\n",1); //append new line
                             firstWord = 1;

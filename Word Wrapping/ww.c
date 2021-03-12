@@ -72,6 +72,7 @@ int wrap(int width, int input_fd, int output_fd){
     read_buff = (char*) calloc(SIZE, sizeof(char)); //don't attempt to read entire file in read
 
     strbuf_t word;
+    word.used = 1;//need to initialize because its used in the else
 
     char prev[2] = " ";
 

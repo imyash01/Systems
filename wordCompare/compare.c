@@ -14,6 +14,7 @@ typedef struct node
     struct node *right;  
 } node;
 
+
 //int total = 0; not good solution need to figure out how to store total
 //make a struct that stores the roots for files and total words. Store it in an array(WFD Repo)
 
@@ -104,6 +105,30 @@ int tokenize(char* filePath) {
     return 0;
 }
 
+node* findWord(node * root, char * word) {
+    if(root == NULL || strcmp(word, root->word) == 0) {
+        return root;
+    }
+    else if(strcmp(word, root->word) < 0) { //if word we are searching for is less than current, search left
+        findWord(root->left, word);
+    }
+    else {
+        findword(root->right, word); //if word we are searching is greater, search right
+    }
+
+}
+
+int calcJSD(node *root1, node *root2) { 
+    node* forMeanFreq;
+    //go through root1 first
+    if(root1 == NULL){
+        return;
+    }
+    calcJSD(root1->left,root2->right);
+
+
+
+}
 int main(int argc, char* argv[]){
     tokenize("file2.txt");
     tokenize("file1.txt");

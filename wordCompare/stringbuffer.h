@@ -1,3 +1,6 @@
+#ifndef STRBUF
+#define STRBUF
+
 typedef struct {
     size_t length;
     size_t used;
@@ -10,3 +13,4 @@ int sb_append(strbuf_t *, char);
 int sb_remove(strbuf_t *, char *);
 int sb_insert(strbuf_t *, int, char);
 int sb_concat(strbuf_t *, char *);
+#endif

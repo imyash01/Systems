@@ -2,10 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "stringbuffer.c"
+#include "stringbuffer.h"
 
 typedef struct node
 {
+    int totalWords; //root of the bst holds tha total words in the file
     int occurences;
     double frequency;
     char* word;
@@ -13,11 +14,11 @@ typedef struct node
     struct node *right;  
 } node;
 
-int total = 0; //not good solution need to figure out how to store total
+//int total = 0; not good solution need to figure out how to store total
 //make a struct that stores the roots for files and total words. Store it in an array(WFD Repo)
 
 node * makeNode(char* word){
-    node *newNode = malloc(sizeof(node));
+    node *newNode = calloc(5,sizeof(node));
     newNode->word = word;
     newNode->left = NULL;
     newNode->right = NULL;
@@ -28,15 +29,14 @@ node * makeNode(char* word){
 
 node* toAdd(char* word, node* root){
     if(root ==  NULL){
-        total++;//CHECK
+        //total++;//CHECK
         return makeNode(word);
     }
     int comp = strcmp(word,root->word);
     if(comp == 0){
         root->occurences ++;
-        total++;//CHECK
     }
-    if(comp < 0){
+    else if(comp < 0){
         root->left = toAdd(word, root->left);
     }
     else{
@@ -45,17 +45,26 @@ node* toAdd(char* word, node* root){
     return root;
 }
 
-void toFreq(node * root){
+void toFreq(node * root, int total){
     if(root == NULL){
         return;
     }
-    toFreq(root->left);
+    toFreq(root->left,total);
     //TODO make total
     root->frequency = (double)root->occurences/total;
-    toFreq(root->right);
+    toFreq(root->right,total);
 }
 
-//CHECK change words to lowercase
+void toPrint(node * root){
+    if(root == NULL){
+        return;
+    }
+    toPrint(root->left);
+    printf("%s->%f\t", root->word,root->frequency);
+    toPrint(root->right);
+}
+
+
 int tokenize(char* filePath) {
    
     FILE *fp = fopen(filePath, "r");
@@ -67,7 +76,7 @@ int tokenize(char* filePath) {
 
     while((temp = fgetc(fp)) != EOF ) {
         if(isalpha(temp) != 0) {
-            sb_append(&word, temp);
+            sb_append(&word, tolower(temp));
         }
         else if(isspace(temp) && word.used != 1){
             char *temp2 = malloc(sizeof(char) * word.used);
@@ -75,6 +84,7 @@ int tokenize(char* filePath) {
             sb_destroy(&word);
             sb_init(&word, 32);
             root = toAdd(temp2, root);
+            root->totalWords++;
         }
     }
 
@@ -84,13 +94,17 @@ int tokenize(char* filePath) {
         sb_destroy(&word);
         sb_init(&word, 32);
         root = toAdd(temp2, root);
+        root->totalWords++;
     }
 
-    toFreq(root); // assigns the frequences
+    toFreq(root,root->totalWords); // assigns the frequences
+    toPrint(root);
+    printf("%d\n",root->totalWords);
     fclose(fp);
     return 0;
 }
 
 int main(int argc, char* argv[]){
+    tokenize("file2.txt");
     tokenize("file1.txt");
 }

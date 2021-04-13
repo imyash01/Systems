@@ -103,33 +103,34 @@ int sb_concat(strbuf_t* list, char* str){
 
 int tokenize(char* filePath) {
    
-FILE *fp = fopen(filePath, "r");
+    FILE *fp = fopen(filePath, "r");
 
-char temp;
-node *root = NULL;
-strbuf_t word;
-sb_init(&word, 32);
-while((temp = fgetc(fp)) != EOF ) {
-    //strbuf_t word;
-   // sb_init(&word, 32);
-    //node *root = NULL;
-    if(isalpha(temp) == 0) {
-        continue;
-    }
-    if(!isspace(temp) && word.used != 1) {
-        sb_append(&word, temp);
+    char temp;
+    node *root = NULL;
+    strbuf_t word;
+    sb_init(&word, 32);
+    while((temp = fgetc(fp)) != EOF ) {
+        //strbuf_t word;
+    // sb_init(&word, 32);
+        //node *root = NULL;
+        if(isalpha(temp) == 0) {
+            continue;
+        }
+        if(!isspace(temp) && word.used != 1) {
+            sb_append(&word, temp);
 
-    } else {
-        char *temp2 = malloc(sizeof(char) * word.used);
-        strcpy(temp2, word.data);
-        sb_destroy(&word);
-        sb_init(&word, 32);
-        root = toAdd(temp2, root);
+        } 
+        else {
+            char *temp2 = malloc(sizeof(char) * word.used);
+            strcpy(temp2, word.data);
+            sb_destroy(&word);
+            sb_init(&word, 32);
+            root = toAdd(temp2, root);
+        }
+        
     }
-    
-}
-toPrint(root);
-return 0;
+    toPrint(root);
+    return 0;
 }
 
 int main(int argc, char* argv[]){

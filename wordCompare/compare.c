@@ -2,24 +2,46 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <pthread.h>
+#include <math.h>
 #include "stringbuffer.h"
 
-typedef struct node
+/*#ifndef QSIZE
+#define QSIZE 8 // bounded queue
+#endif*/
+
+typedef struct node_bst
 {
-    int totalWords; //root of the bst holds tha total words in the file
     int occurences;
     double frequency;
     char* word;
-    struct node *left;
-    struct node *right;  
-} node;
+    struct node_bst *left;
+    struct node_bst *right;  
+} node_bst;
 
+typedef struct parent_node
+{
+    int totalWords;
+    node_bst* child_root;
+}parent_node;
+
+
+typedef struct node_Q
+{
+    char* path;
+    struct node_Q* next;
+}node_Q;
 
 //int total = 0; not good solution need to figure out how to store total
 //make a struct that stores the roots for files and total words. Store it in an array(WFD Repo)
 
-node * makeNode(char* word){
-    node *newNode = calloc(5,sizeof(node));
+node_bst * makeNode(char* word){
+    node_bst *newNode = malloc(sizeof(node_bst));
     newNode->word = word;
     newNode->left = NULL;
     newNode->right = NULL;
@@ -28,7 +50,14 @@ node * makeNode(char* word){
     return newNode;
 }
 
-node* toAdd(char* word, node* root){
+parent_node* makeParent(){
+    parent_node* temp = malloc(sizeof(parent_node));
+    temp->child_root = NULL;
+    temp->totalWords = 0;
+    return temp;
+}
+
+node_bst* toAdd(char* word, node_bst* root){
     if(root ==  NULL){
         //total++;//CHECK
         return makeNode(word);
@@ -46,7 +75,7 @@ node* toAdd(char* word, node* root){
     return root;
 }
 
-void toFreq(node * root, int total){
+void toFreq(node_bst *root, int total){
     if(root == NULL){
         return;
     }
@@ -56,7 +85,7 @@ void toFreq(node * root, int total){
     toFreq(root->right,total);
 }
 
-void toPrint(node * root){
+void toPrint(node_bst * root){
     if(root == NULL){
         return;
     }
@@ -65,13 +94,35 @@ void toPrint(node * root){
     toPrint(root->right);
 }
 
+int isdir(char* name) {
+	struct stat data;
+	
+	int err = stat(name, &data);
+	
+	if (err == -1) {
+		perror(name);  // print error message
+		return -1;
+	}
+    // S_ISDIR macro is true if the st_mode says the file is a directory
+	// S_ISREG macro is true if the st_mode says the file is a regular file
+	if (S_ISDIR(data.st_mode)) {
+		return 1;
+	} 
+    else if (S_ISREG(data.st_mode)) {
+        return 0;
+    } 
+	
+	return -1;
+}
 
-int tokenize(char* filePath) {
+
+parent_node* tokenize(char* filePath) { //return the root maybe
    
     FILE *fp = fopen(filePath, "r");
 
     char temp;
-    node *root = NULL;
+    parent_node* parent = makeParent();
+    node_bst *root = NULL;
     strbuf_t word;
     sb_init(&word, 32);
 
@@ -85,7 +136,7 @@ int tokenize(char* filePath) {
             sb_destroy(&word);
             sb_init(&word, 32);
             root = toAdd(temp2, root);
-            root->totalWords++;
+            parent->totalWords++;
         }
     }
 
@@ -95,17 +146,19 @@ int tokenize(char* filePath) {
         sb_destroy(&word);
         sb_init(&word, 32);
         root = toAdd(temp2, root);
-        root->totalWords++;
+        parent->totalWords++;
     }
 
-    toFreq(root,root->totalWords); // assigns the frequences
+    parent->child_root = root;
+
+    toFreq(root,parent->totalWords); // assigns the frequences
     toPrint(root);
-    printf("%d\n",root->totalWords);
+    printf("%d\n",parent->totalWords);
     fclose(fp);
-    return 0;
+    return parent;
 }
 
-node* findWord(node * root, char * word) {
+node_bst* findWord(node_bst * root, char * word) {
     if(root == NULL || strcmp(word, root->word) == 0) {
         return root;
     }
@@ -113,23 +166,69 @@ node* findWord(node * root, char * word) {
         findWord(root->left, word);
     }
     else {
-        findword(root->right, word); //if word we are searching is greater, search right
+        findWord(root->right, word); //if word we are searching is greater, search right
     }
-
 }
 
-int calcJSD(node *root1, node *root2) { 
-    node* forMeanFreq;
-    //go through root1 first
-    if(root1 == NULL){
-        return;
+void getMeanFreqHelper(node_bst* tree1, node_bst* tree2, parent_node* meanTree){
+    node_bst* temp;
+    node_bst* temp2;
+
+    if(tree1 != NULL){
+        getMeanFreqHelper(tree1->left,tree2,meanTree);
+
+        temp = findWord(meanTree->child_root,tree1->word);
+
+        if(temp == NULL){
+
+            meanTree->child_root = toAdd(tree1->word,meanTree->child_root);
+            temp = findWord(meanTree->child_root,tree1->word);
+
+            temp2 = findWord(tree2, tree1->word);
+
+            if(temp2 != NULL){
+                temp->frequency = .5*(temp2->frequency + tree1->frequency);
+            }
+            else{
+                temp->frequency = .5*(tree1->frequency);
+            }
+        }
+        getMeanFreqHelper(tree1->right,tree2,meanTree);
     }
-    calcJSD(root1->left,root2->right);
-
-
-
 }
+
+parent_node* getMeanFreq(parent_node* tree1, parent_node* tree2){
+    parent_node* temp = makeParent();
+    getMeanFreqHelper(tree1->child_root,tree2->child_root,temp);
+    getMeanFreqHelper(tree2->child_root,tree1->child_root,temp);
+    return temp;
+}
+
+float getKLD(node_bst* tree1, node_bst* meanTree){
+    node_bst* temp;
+    float num = 0.0;
+    
+    if(tree1 != NULL){
+        temp = findWord(meanTree,tree1->word);
+        num = tree1->frequency * log2(tree1->frequency/temp->frequency);
+        return num + getKLD(tree1->left,meanTree) + getKLD(tree1->right,meanTree);
+    }
+    else{
+        return 0.0;
+    }
+}
+
+float getJSD(node_bst* tree1, node_bst* tree2, node_bst* meanTree){
+    return sqrt((.5 * getKLD(tree1,meanTree)) + (.5 * getKLD(tree2,meanTree)));
+}
+
+
 int main(int argc, char* argv[]){
-    tokenize("file2.txt");
-    tokenize("file1.txt");
+    parent_node* one = makeParent();
+    parent_node* two = makeParent();
+    two = tokenize("file2.txt");
+    one = tokenize("/ilab/users/yp315/CS214_project/file1.txt");
+    parent_node* mean;
+    mean = getMeanFreq(one,two);
+    printf("%f\n",getJSD(one->child_root,two->child_root,mean->child_root));
 }

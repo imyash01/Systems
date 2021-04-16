@@ -46,7 +46,7 @@ typedef struct queue_t{
 	pthread_cond_t read_ready;
 } queue_t;
 
-typedef struct node_wfd{
+typedef struct node_wfd{ //LL wfdrepo
     parent_node* fileRoot;
     struct node_wfd* next;
     pthread_mutex_t lock;
@@ -70,7 +70,7 @@ typedef struct targs_d{
 //make a struct that stores the roots for files and total words. Store it in an array(WFD Repo)
 
 node_wfd* addWfdNode(node_wfd* root,parent_node* item){
-    pthread_mutex_lock(&root->lock);
+    //pthread_mutex_lock(&root->lock);
     node_wfd* curr = root;
     node_wfd* prev = NULL;
 
@@ -78,7 +78,7 @@ node_wfd* addWfdNode(node_wfd* root,parent_node* item){
     newNode->fileRoot = item;
     newNode->next = NULL;
 
-    if(root->fileRoot == NULL){
+    if(root == NULL){
         return newNode;
     }
     while(curr != NULL){
@@ -91,15 +91,15 @@ node_wfd* addWfdNode(node_wfd* root,parent_node* item){
     else{
         prev ->next = newNode;
     }
-    pthread_mutex_unlock(&root->lock);
+    //pthread_mutex_unlock(&root->lock);
     return root;
 }
 
-int wfdInit(node_wfd* root){
+/*int wfdInit(node_wfd* root){
     pthread_mutex_init(&root->lock, NULL);
     root->fileRoot = NULL;
     root->next = NULL;
-}
+}*/
 
 node_bst * makeNode(char* word){
     node_bst *newNode = malloc(sizeof(node_bst));
@@ -195,14 +195,15 @@ node_Q* dequeue(queue_t *Q) //CHECK add active threads return char*.
 	pthread_mutex_lock(&Q->lock);
 
 	if(Q->count == 0){
-		--Q->activeThreads;
+		Q->activeThreads--;
+        //printf("%d threads \n", Q->activeThreads);
 		if(Q->activeThreads == 0){
 			pthread_mutex_unlock(&Q->lock);
 			pthread_cond_broadcast(&Q->read_ready);
 			return NULL;
 		}
 
-		while (Q->count == 0 && Q->front == NULL) {
+		while (Q->count != 0 && Q->front == NULL) {
 			pthread_cond_wait(&Q->read_ready, &Q->lock);
 		}
 
@@ -273,6 +274,10 @@ int isdir(char* name) {
 parent_node* tokenize(char* filePath) { //CHECK include -
    
     FILE *fp = fopen(filePath, "r");
+    if(fp == NULL){
+        printf("File %s could not be open", filePath);
+        return NULL;
+    }
 
     char temp;
     parent_node* parent = makeParent();
@@ -376,15 +381,15 @@ double getJSD(node_bst* tree1, node_bst* tree2, node_bst* meanTree){
     return sqrt((.5 * getKLD(tree1,meanTree)) + (.5 * getKLD(tree2,meanTree)));
 }
 
-void* dirThread(void *A)
+void* dirThread(void *A) //CHECK SUFFIX
 {
     targs_d *args = A;
     //gets tids,queue*dir and file,suffix
-    while(1){
+    while(args->dir->activeThreads != 0){
         node_Q* returned = dequeue(args->dir); //returned from queue
 
-        if(returned == NULL && args->dir->activeThreads == 0){
-            break; // get out of the loop because the queue is empty
+        if(returned == NULL){
+            continue; // get out of the loop because the queue is empty
         }
         DIR *dirp = opendir(returned->path);  // open the current directory
         struct dirent *folder;
@@ -399,9 +404,6 @@ void* dirThread(void *A)
             sb_concat(&path,returned->path);
             sb_append(&path,'/');
             sb_concat(&path,folder->d_name);
-            
-            printf("Hi\n");
-            //free(returned);//CHECK free returned
 
             if(folder->d_name[0] == '.') {
                 sb_destroy(&path);
@@ -423,7 +425,7 @@ void* dirThread(void *A)
                     //string buffer has the path copy it to a string destroy it and then enqueue the char*
                     char * str = calloc(path.used,sizeof(char));
                     strcpy(str, path.data);
-                    printf("%s\n", str);
+                    //printf("%s\n", str);
                     enqueue(args->file,str); //enqueue the file
                 }
                 else if (reti == REG_NOMATCH) {
@@ -435,6 +437,7 @@ void* dirThread(void *A)
                 //copy enqueue of file
                 char *str1 = calloc(path.used,sizeof(char));
                 strcpy(str1, path.data);
+                //printf("%s\n", str1);
                 enqueue(args->dir,str1);
                 //enqueue to the dir queue
             }
@@ -444,6 +447,7 @@ void* dirThread(void *A)
             sb_destroy(&path);
         }
         closedir(dirp);
+        free(returned);
     }
     return 0;
 }
@@ -451,16 +455,17 @@ void* dirThread(void *A)
 void *fileThread(void *A)
 {
     targs_f *args = A;
-
-    while(1){
+    while(args->file->activeThreads != 0){
        node_Q* returned =  dequeue(args->file);
 
-       if(returned == NULL && args->file->activeThreads == 0){
-            break; // get out of the loop because the queue is empty
+       if(returned == NULL){
+            continue; // get out of the loop because the queue is empty
         }
-        tokenize(returned->path);
+        args->root_wfd = addWfdNode(args->root_wfd,tokenize(returned->path));
+        //toPrint(args->root_wfd->fileRoot->child_root);
+        free(returned);
     }
-    return NULL;
+    return 0;
 }
 
 int main(int argc, char* argv[]){
@@ -471,15 +476,16 @@ int main(int argc, char* argv[]){
     char* suffix = NULL;
     queue_t file;
     queue_t dir;
-    struct targs_d *args_d;
-    struct targs_f *args_f;
+    targs_d args_d;
+    targs_f args_f;
     pthread_t *tids_d;
     pthread_t *tids_f;
-    node_wfd* root = malloc(sizeof(node_wfd));
+    node_wfd* root = NULL;
     
     //wfdInit(root);
     init(&file);
     init(&dir);
+    
     for(int i = 1; i < argc; i++){
         if(argv[i][0] == '-'){
             int len = strlen(argv[i]);
@@ -547,26 +553,37 @@ int main(int argc, char* argv[]){
         }
     }
 
-    args_d = malloc(dThreads * sizeof(targs_d));
-    tids_d = malloc(dThreads * sizeof(pthread_t));
+    printf("Dir Threads:%d\n", dThreads);
+    file.activeThreads = fThreads;
+    dir.activeThreads = dThreads;
 
-    args_f = malloc(fThreads * sizeof(targs_f));
+    args_d.file = &file;
+    args_d.dir = &dir;
+    args_d.suffix = suffix;
+    dir.activeThreads = dThreads;
+
+    args_f.file = &file;
+    args_f.root_wfd = root;
+    file.activeThreads = fThreads;
+
+    tids_d = malloc(dThreads * sizeof(pthread_t));
     tids_f = malloc(fThreads * sizeof(pthread_t));
 
     for(int i = 0; i < dThreads;i++){
-        args_d[i].dir = &dir;
-        args_d[i].file = &file;
-        args_d[i].id = i;
-        args_d[i].suffix = suffix;
-        pthread_create(&tids_d[i],NULL,dirThread,&args_d[i]);
+        pthread_create(&tids_d[i],NULL,dirThread,&args_d);
     }
     for(int i = 0; i < dThreads; i++){
         pthread_join(tids_d[i],NULL);
     }
-    /*for(int i = 0; i < fThreads;i++){
-        args_f[i].file = file;
-        args_f[i].id = i;
-        args_f[i].root_wfd = root;
-        pthread_create(&tids_f[i],NULL,fileThread,&args_f[i]);
-    }*/
+    
+    for(int i = 0; i < fThreads;i++){
+        pthread_create(&tids_f[i],NULL,fileThread,&args_f);
+    }
+    for(int i = 0; i < fThreads; i++){
+        pthread_join(tids_f[i],NULL);
+    }
+
+    root = args_f.root_wfd;
+    //node_wfd*
+    toPrint(root->fileRoot->child_root);
 }

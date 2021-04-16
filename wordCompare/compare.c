@@ -49,6 +49,8 @@ typedef struct queue_t{
 typedef struct node_wfd{ //LL wfdrepo
     parent_node* fileRoot;
     struct node_wfd* next;
+    char* filePath;
+    int totalFiles;
     pthread_mutex_t lock;
 }node_wfd;
 
@@ -66,10 +68,17 @@ typedef struct targs_d{
     int id;
 }targs_d;
 
+typedef struct jsd_t{
+    node_wfd* file1;
+    node_wfd* file2;
+    int combinedWords;
+    double jsd;
+}jsd_t;
+
 //int total = 0; not good solution need to figure out how to store total
 //make a struct that stores the roots for files and total words. Store it in an array(WFD Repo)
 
-node_wfd* addWfdNode(node_wfd* root,parent_node* item){
+node_wfd* addWfdNode(node_wfd* root,parent_node* item, char* path){
     //pthread_mutex_lock(&root->lock);
     node_wfd* curr = root;
     node_wfd* prev = NULL;
@@ -77,8 +86,10 @@ node_wfd* addWfdNode(node_wfd* root,parent_node* item){
     node_wfd* newNode = malloc(sizeof(node_wfd));
     newNode->fileRoot = item;
     newNode->next = NULL;
+    newNode->filePath = path;
 
     if(root == NULL){
+        newNode->totalFiles = 1;
         return newNode;
     }
     while(curr != NULL){
@@ -91,6 +102,7 @@ node_wfd* addWfdNode(node_wfd* root,parent_node* item){
     else{
         prev ->next = newNode;
     }
+    root->totalFiles++;
     //pthread_mutex_unlock(&root->lock);
     return root;
 }
@@ -279,6 +291,7 @@ parent_node* tokenize(char* filePath) { //CHECK include -
         return NULL;
     }
 
+    int wroteWord;
     char temp;
     parent_node* parent = makeParent();
     node_bst *root = NULL;
@@ -286,7 +299,7 @@ parent_node* tokenize(char* filePath) { //CHECK include -
     sb_init(&word, 32);
 
     while((temp = fgetc(fp)) != EOF ) {
-        if(isalpha(temp) != 0) {
+        if(isalpha(temp) != 0 || temp == '-') {
             sb_append(&word, tolower(temp));
         }
         else if(isspace(temp) && word.used != 1){
@@ -296,6 +309,7 @@ parent_node* tokenize(char* filePath) { //CHECK include -
             sb_init(&word, 32);
             root = toAdd(temp2, root);
             parent->totalWords++;
+            wroteWord = 1;
         }
     }
 
@@ -306,15 +320,19 @@ parent_node* tokenize(char* filePath) { //CHECK include -
         sb_init(&word, 32);
         root = toAdd(temp2, root);
         parent->totalWords++;
+        wroteWord = 1;
     }
-
-    parent->child_root = root;
-
-    toFreq(root,parent->totalWords); // assigns the frequences
-    //toPrint(root);
-    //printf("%d\n",parent->totalWords);
-    fclose(fp);
-    return parent;
+    if(wroteWord){
+        parent->child_root = root;
+        toFreq(root,parent->totalWords); // assigns the frequences
+        //toPrint(root);
+        //printf("%d\n",parent->totalWords);
+        fclose(fp);
+        return parent;
+    }
+    else{
+        return NULL;
+    }
 }
 
 node_bst* findWord(node_bst * root, char * word) {
@@ -383,6 +401,7 @@ double getJSD(node_bst* tree1, node_bst* tree2, node_bst* meanTree){
 
 void* dirThread(void *A) //CHECK SUFFIX
 {
+    int error = 0;
     targs_d *args = A;
     //gets tids,queue*dir and file,suffix
     while(args->dir->activeThreads != 0){
@@ -417,7 +436,8 @@ void* dirThread(void *A) //CHECK SUFFIX
                 reti = regcomp(&regex, args->suffix ,REG_EXTENDED);
 
                 if (reti) {
-                    //error regex couldnt 
+                    write(2,"regex failed",13);
+                    exit(1); 
                 }
 
                 reti = regexec(&regex, folder->d_name,0,NULL,0);
@@ -442,18 +462,25 @@ void* dirThread(void *A) //CHECK SUFFIX
                 //enqueue to the dir queue
             }
             else{
-                //error
+                write(2,"The path is not dir or file",29);
+                error = 1;
             }
             sb_destroy(&path);
         }
         closedir(dirp);
         free(returned);
     }
-    return 0;
+    if(error){
+        return (void*)1;
+    }
+    else{
+        return 0;
+    }
 }
 
 void *fileThread(void *A)
 {
+    int error = 1;
     targs_f *args = A;
     while(args->file->activeThreads != 0){
        node_Q* returned =  dequeue(args->file);
@@ -461,14 +488,54 @@ void *fileThread(void *A)
        if(returned == NULL){
             continue; // get out of the loop because the queue is empty
         }
-        args->root_wfd = addWfdNode(args->root_wfd,tokenize(returned->path));
-        //toPrint(args->root_wfd->fileRoot->child_root);
+        parent_node* temp = tokenize(returned->path);
+
+        char* path = malloc(strlen(returned->path));//to free the queue node but pass the path
+        strcpy(path,returned->path);
+
+        if(temp == NULL){
+            error = 1;
+        }
+        else{
+            args->root_wfd = addWfdNode(args->root_wfd,temp,path);
+        }
+        
         free(returned);
     }
-    return 0;
+    if(error){
+        return (void*)1;
+    }
+    else{
+        return 0;
+    }
 }
 
+void createPermutations(jsd_t** array, node_wfd* head){
+    node_wfd* p1 = head;
+    node_wfd* p2 = head->next;
+    int i = 0;
+
+    while(p1 != NULL){
+        while(p2 != NULL){
+            array[i] = malloc(sizeof(jsd_t));
+            array[i]->file1 = p1;
+            array[i]->file2 = p2;
+            array[i]->combinedWords = p1->fileRoot->totalWords + p2->fileRoot->totalWords;
+            p2 = p2->next;
+            i++;
+        }
+        p1 = p1->next;
+        if(p1 != NULL)
+            p2 = p1->next;
+    }
+}
+
+void* analThread(void* A){
+    
+    return 0;
+}
 int main(int argc, char* argv[]){
+    int error = 0;
     int dThreads = 1;
     int fThreads = 1;
     int aThreads = 1;
@@ -497,22 +564,22 @@ int main(int argc, char* argv[]){
                     case 'd':
                         if(isdigit(argv[i][2]))
                             dThreads = (int)argv[i][2] -48;
-                        //else
-                            //error
+                        else
+                            write(2,"not a number", 13);
                         break;
                     
                     case 'f':
                         if(isdigit(argv[i][2]))
                             fThreads = (int)argv[i][2] -48;
-                        //else
-                            //error
+                        else
+                            write(2,"not a number", 13);
                         break;
                         
                     case 'a':
                         if(isdigit(argv[i][2]))
                             aThreads = (int)argv[i][2] - 48;
-                        //else
-                            //error
+                        else
+                            write(2,"not a number", 13);
                         break;
 
                     case 's':
@@ -525,12 +592,12 @@ int main(int argc, char* argv[]){
                         break;
 
                     default:
-                        //error
+                            write(2,"not a valid option", 20);
                         break;
                 }
             }
             else{
-                //error
+                write(2,"not a valid option", 20);
             }
         }
         else{
@@ -584,6 +651,17 @@ int main(int argc, char* argv[]){
     }
 
     root = args_f.root_wfd;
-    //node_wfd*
-    toPrint(root->fileRoot->child_root);
+
+    /*node_wfd* curr = root;
+    while(curr != NULL){
+        printf("%s: ", curr->filePath);
+        toPrint(curr->fileRoot->child_root);
+        printf("\n");
+        curr = curr->next;
+    }*/
+    
+    int compares = .5 * (root->totalFiles)*(root->totalFiles - 1);
+    jsd_t* jsd_repo[compares];
+    createPermutations(jsd_repo,root);
+    printf("%s\t %s", jsd_repo[2]->file1->filePath, jsd_repo[2]->file2->filePath);
 }

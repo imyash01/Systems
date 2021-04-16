@@ -75,8 +75,39 @@ typedef struct jsd_t{
     double jsd;
 }jsd_t;
 
+typedef struct index_t{
+    int currIndex;
+    int compares;
+    int aThreads;
+    pthread_mutex_t lock;
+}index_t;
+
+typedef struct targs_a{
+    jsd_t** jsd;
+    index_t* i;
+}targs_a;
 //int total = 0; not good solution need to figure out how to store total
 //make a struct that stores the roots for files and total words. Store it in an array(WFD Repo)
+
+int indexInit(index_t* i,int totalCompares, int aThreads){
+    i->aThreads = aThreads;
+    i->compares = totalCompares;
+    i->currIndex = 0;
+    pthread_mutex_init(&i->lock, NULL);
+}
+
+int getIndex(index_t* i){
+    pthread_mutex_lock(&i->lock);
+    int temp = i->currIndex;
+    if(i->currIndex < i->compares){
+        i->currIndex++;
+    }
+    else{
+        temp = -1;
+    }
+    pthread_mutex_unlock(&i->lock);
+    return temp;
+}
 
 node_wfd* addWfdNode(node_wfd* root,parent_node* item, char* path){
     //pthread_mutex_lock(&root->lock);
@@ -215,7 +246,7 @@ node_Q* dequeue(queue_t *Q) //CHECK add active threads return char*.
 			return NULL;
 		}
 
-		while (Q->count != 0 && Q->front == NULL) {
+		while (Q->count == 0 && Q->activeThreads != 0) {
 			pthread_cond_wait(&Q->read_ready, &Q->lock);
 		}
 
@@ -284,7 +315,7 @@ int isdir(char* name) {
 
 
 parent_node* tokenize(char* filePath) { //CHECK include -
-   
+    
     FILE *fp = fopen(filePath, "r");
     if(fp == NULL){
         printf("File %s could not be open", filePath);
@@ -402,7 +433,7 @@ double getJSD(node_bst* tree1, node_bst* tree2, node_bst* meanTree){
 void* dirThread(void *A) //CHECK SUFFIX
 {
     int error = 0;
-    targs_d *args = A;
+    targs_d *args = (targs_d*)A;
     //gets tids,queue*dir and file,suffix
     while(args->dir->activeThreads != 0){
         node_Q* returned = dequeue(args->dir); //returned from queue
@@ -481,7 +512,7 @@ void* dirThread(void *A) //CHECK SUFFIX
 void *fileThread(void *A)
 {
     int error = 1;
-    targs_f *args = A;
+    targs_f *args = (targs_f*)A;
     while(args->file->activeThreads != 0){
        node_Q* returned =  dequeue(args->file);
 
@@ -531,8 +562,20 @@ void createPermutations(jsd_t** array, node_wfd* head){
 }
 
 void* analThread(void* A){
-    
+    targs_a *args = (targs_a*)A;
+    int i;
+    while((i = getIndex(args->i)) >= 0){
+        parent_node* temp = getMeanFreq(args->jsd[i]->file1->fileRoot, args->jsd[i]->file2->fileRoot);
+        args->jsd[i]->jsd = getJSD(args->jsd[i]->file1->fileRoot->child_root, args->jsd[i]->file2->fileRoot->child_root , temp->child_root);
+    }
     return 0;
+}
+
+int cmpArr(const void* one, const void* two){
+    double a = (*(jsd_t**)one)->combinedWords;
+    double b = (*(jsd_t**)two)->combinedWords;
+
+    return a - b;
 }
 int main(int argc, char* argv[]){
     int error = 0;
@@ -619,8 +662,7 @@ int main(int argc, char* argv[]){
             }
         }
     }
-
-    printf("Dir Threads:%d\n", dThreads);
+    
     file.activeThreads = fThreads;
     dir.activeThreads = dThreads;
 
@@ -652,16 +694,36 @@ int main(int argc, char* argv[]){
 
     root = args_f.root_wfd;
 
-    /*node_wfd* curr = root;
-    while(curr != NULL){
-        printf("%s: ", curr->filePath);
+    node_wfd* curr = root;
+    /*while(curr != NULL){
+        //printf("%s: ", curr->filePath);
         toPrint(curr->fileRoot->child_root);
         printf("\n");
         curr = curr->next;
     }*/
-    
+    index_t i;
+    pthread_t *tids_a;
+    targs_a args_a;
+    tids_a = malloc(aThreads * sizeof(pthread_t));
     int compares = .5 * (root->totalFiles)*(root->totalFiles - 1);
     jsd_t* jsd_repo[compares];
     createPermutations(jsd_repo,root);
-    printf("%s\t %s", jsd_repo[2]->file1->filePath, jsd_repo[2]->file2->filePath);
+    indexInit(&i,compares,aThreads);
+    args_a.i = &i;
+    args_a.jsd = jsd_repo;
+    
+    for(int i = 0; i < aThreads;i++){
+        pthread_create(&tids_a[i],NULL,analThread,&args_a);
+    }
+    for(int i = 0; i < aThreads; i++){
+        pthread_join(tids_a[i],NULL);
+    }
+
+    qsort(jsd_repo, compares, sizeof(jsd_t*), cmpArr);
+
+    for(int i = 0; i < compares;i++){
+        printf("%f %s %s\n",jsd_repo[i]->jsd,jsd_repo[i]->file1->filePath,jsd_repo[i]->file2->filePath);
+    }
+
+    return 0;
 }

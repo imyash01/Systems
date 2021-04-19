@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <ctype.h>
 #include <math.h>
 
@@ -10,6 +11,10 @@
 node_bst * makeNode(char* word){
     node_bst *newNode = malloc(sizeof(node_bst));
     char * temp = malloc(strlen(word) + 1);
+    if(newNode == NULL || temp == NULL){
+        write(2, "malloc failed\n",15);
+        exit(1);
+    }
     strcpy(temp, word);
     newNode->word = temp;
     newNode->left = NULL;
@@ -21,6 +26,10 @@ node_bst * makeNode(char* word){
 
 parent_node* makeParent(){
     parent_node* temp = malloc(sizeof(parent_node));
+    if(temp == NULL){
+        write(2, "malloc failed\n",15);
+        exit(1);
+    }
     temp->child_root = NULL;
     temp->totalWords = 0;
     return temp;
@@ -90,7 +99,7 @@ parent_node* tokenize(char* filePath) { //CHECK include -
     sb_init(&word, 32);
 
     while((temp = fgetc(fp)) != EOF ) {
-        if(isalpha(temp) != 0 || temp == '-') {
+        if(isalpha(temp) != 0 || temp == '-' || isdigit(temp) != 0) {
             sb_append(&word, tolower(temp));
         }
         else if(isspace(temp) && word.used != 1){

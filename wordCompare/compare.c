@@ -27,6 +27,10 @@ void createPermutations(jsd_t** array, node_wfd* head){
     while(p1 != NULL){
         while(p2 != NULL){
             array[i] = malloc(sizeof(jsd_t));
+            if(array[i] == NULL){
+                write(2, "malloc failed\n",15);
+                exit(1);
+            }
             array[i]->file1 = p1;
             array[i]->file2 = p2;
             array[i]->combinedWords = p1->fileRoot->totalWords + p2->fileRoot->totalWords;
@@ -69,28 +73,47 @@ int main(int argc, char* argv[]){
             int len = strlen(argv[i]);
             if(len > 2){
                 char option = tolower(argv[i][1]);
-                
+                char* digit = calloc(strlen(argv[i]), sizeof(char));
+
                 switch (option)
                 {
                     case 'd':
-                        if(isdigit(argv[i][2]))
-                            dThreads = (int)argv[i][2] -48;
-                        else
-                            write(2,"not a number", 13);
+                        for(int j = 2; j < len ; j++){
+                            if(isdigit(argv[i][j])){
+                                digit[j - 2] = argv[i][j];
+                            }
+                            else{
+                                write(2,"not a number", 13);
+                                exit(1);
+                            }
+                        }
+                        dThreads = atoi(digit);
                         break;
                     
                     case 'f':
-                        if(isdigit(argv[i][2]))
-                            fThreads = (int)argv[i][2] -48;
-                        else
-                            write(2,"not a number", 13);
+                        for(int j = 2; j < len; j++){
+                            if(isdigit(argv[i][j])){
+                                digit[j - 2] = argv[i][j];
+                            }
+                            else{
+                                write(2,"not a number", 13);
+                                exit(1);
+                            }
+                        }
+                        fThreads = atoi(digit); 
                         break;
                         
                     case 'a':
-                        if(isdigit(argv[i][2]))
-                            aThreads = (int)argv[i][2] - 48;
-                        else
-                            write(2,"not a number", 13);
+                        for(int j = 2; j < len; j++){
+                            if(isdigit(argv[i][j])){
+                                digit[j - 2] = argv[i][j];
+                            }
+                            else{
+                                write(2,"not a number", 13);
+                                exit(1);
+                            }
+                        }
+                        aThreads = atoi(digit);
                         break;
 
                     case 's':
@@ -106,6 +129,7 @@ int main(int argc, char* argv[]){
                             write(2,"not a valid option", 20);
                         break;
                 }
+                free(digit);
             }
             else{
                 write(2,"not a valid option", 20);
@@ -114,6 +138,10 @@ int main(int argc, char* argv[]){
         else{
             if(change){
                 suffix = malloc(5);
+                if(suffix == NULL){
+                    write(2, "malloc failed\n",15);
+                    exit(1);
+                }
                 strcpy(suffix,".txt");
                 change = 0;
             }
@@ -146,6 +174,11 @@ int main(int argc, char* argv[]){
     tids_d = malloc(dThreads * sizeof(pthread_t));
     tids_f = malloc(fThreads * sizeof(pthread_t));
 
+    if(tids_d == NULL || tids_f == NULL){
+        write(2, "malloc failed\n",15);
+        exit(1);
+    }
+
     for(int i = 0; i < dThreads;i++){
         pthread_create(&tids_d[i],NULL,dirThread,&args_d);
     }
@@ -166,7 +199,14 @@ int main(int argc, char* argv[]){
     pthread_t *tids_a;
     targs_a args_a;
     tids_a = malloc(aThreads * sizeof(pthread_t));
+
+    if(tids_a == NULL){
+        write(2, "malloc failed\n",15);
+        exit(1);
+    }
+
     int compares = .5 * (root->totalFiles)*(root->totalFiles - 1);
+
     jsd_t* jsd_repo[compares];
     createPermutations(jsd_repo,root);
     indexInit(&i,compares,aThreads);
@@ -207,4 +247,11 @@ int main(int argc, char* argv[]){
     }
 
         temp1 = NULL;
+
+    if(compares < 1){
+        write(2, "not enough files\n",18);
+        exit(1);
+    }
+    
+    return 0;
 }

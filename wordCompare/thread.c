@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <regex.h>
 #include <dirent.h>
 #include <pthread.h>
@@ -41,6 +42,10 @@ node_wfd* addWfdNode(node_wfd* root,parent_node* item, char* path){
     node_wfd* prev = NULL;
 
     node_wfd* newNode = malloc(sizeof(node_wfd));
+    if(newNode == NULL){
+        write(2, "malloc failed\n",15);
+        exit(1);
+    }
     newNode->fileRoot = item;
     newNode->next = NULL;
     newNode->filePath = path;
@@ -91,10 +96,20 @@ int isdir(char* name) { //checks dir for threads
 	return -1;
 }
 
+int isSuffix(char* suffix, char* string){
+    for(int i = strlen(suffix) - 1; i >= 0; i--){
+        if(suffix[i] != string[strlen(string) - (strlen(suffix) - i)]){
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void* dirThread(void *A) //CHECK SUFFIX
 {
     int error = 0;
     targs_d *args = (targs_d*)A;
+    
     //gets tids,queue*dir and file,suffix
     while(args->dir->activeThreads != 0){
         node_Q* returned = dequeue(args->dir); //returned from queue
@@ -104,9 +119,6 @@ void* dirThread(void *A) //CHECK SUFFIX
         }
         DIR *dirp = opendir(returned->path);  // open the current directory
         struct dirent *folder;
-
-        regex_t regex;
-        int reti;
 
         while ((folder = readdir(dirp))) { //testDir/.
 
@@ -125,31 +137,16 @@ void* dirThread(void *A) //CHECK SUFFIX
 
             if(check2 == 0){ //file
                 //if file starts with .
-                reti = regcomp(&regex, args->suffix ,REG_EXTENDED);
-
-                if (reti) {
-                    write(2,"regex failed",13);
-                    exit(1); 
-                }
-
-                reti = regexec(&regex, folder->d_name,0,NULL,0);
-                if(!reti){
-                    //string buffer has the path copy it to a string destroy it and then enqueue the char*
-                    //char * str = calloc(path.used,sizeof(char));
-                    //strcpy(str, path.data);
-                    //printf("%s\n", str);
+                int suff = isSuffix(args->suffix,folder->d_name);
+                if(!suff){
                     enqueue(args->file,path.data); //enqueue the file
                 }
-                else if (reti == REG_NOMATCH) {
+                else{
                     sb_destroy(&path);
                     continue;
                 }
             }
             else if(check2 == 1){ //dir
-                //copy enqueue of file
-                //char *str1 = calloc(path.used,sizeof(char));
-                //strcpy(str1, path.data);
-                //printf("%s\n", str1);
                 enqueue(args->dir,path.data);
                 //enqueue to the dir queue
             }
@@ -158,7 +155,6 @@ void* dirThread(void *A) //CHECK SUFFIX
                 error = 1;
             }
             sb_destroy(&path);
-            regfree(&regex);
         }
         closedir(dirp);
         free(returned->path);
@@ -185,6 +181,10 @@ void *fileThread(void *A)
         parent_node* temp = tokenize(returned->path);
 
         char* path = malloc(strlen(returned->path) + 1);//to free the queue node but pass the path
+        if(path == NULL){
+            write(2, "malloc failed\n",15);
+            exit(1);
+        }
         strcpy(path,returned->path);
 
         if(temp == NULL){

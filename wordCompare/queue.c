@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "queue.h"
 #include "bst.h"
@@ -29,6 +30,10 @@ int destroy(queue_t *Q)
 node_Q* newQNode(char* str){
     node_Q* temp = malloc(sizeof(node_Q));
 	char * temp1 = malloc(strlen(str) + 1);
+	if(temp == NULL || temp1 == NULL){
+		write(2, "malloc failed\n",15);
+        exit(1);
+	}
     strcpy(temp1, str);
     temp->path = temp1;
     temp->next = NULL;

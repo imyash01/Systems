@@ -154,7 +154,7 @@ int main(int argc, char* argv[]){
                 enqueue(&file,argv[i]);
             }
             else{
-                //error bad path
+                //error bad path CHECK
             }
         }
     }

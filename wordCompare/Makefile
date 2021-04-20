@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS=-fsanitize=address
+CFLAGS=-g
 
 all:
 	$(CC) $(CFLAGS) compare.c bst.c stringbuffer.c queue.c thread.c -o compare -lm -pthread

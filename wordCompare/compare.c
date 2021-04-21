@@ -211,26 +211,31 @@ int main(int argc, char* argv[]){
         write(2, "malloc failed\n",15);
         exit(1);
     }
+    int compares = 0;
+    if(root != NULL){
+        compares = .5 * (root->totalFiles)*(root->totalFiles - 1);
 
-    int compares = .5 * (root->totalFiles)*(root->totalFiles - 1);
+        jsd_t* jsd_repo[compares];
+        createPermutations(jsd_repo,root);
+        indexInit(&i,compares,aThreads);
+        args_a.i = &i;
+        args_a.jsd = jsd_repo;
+        
+        for(int i = 0; i < aThreads;i++){
+            pthread_create(&tids_a[i],NULL,analThread,&args_a);
+        }
+        for(int i = 0; i < aThreads; i++){
+            pthread_join(tids_a[i],NULL);
+        }
 
-    jsd_t* jsd_repo[compares];
-    createPermutations(jsd_repo,root);
-    indexInit(&i,compares,aThreads);
-    args_a.i = &i;
-    args_a.jsd = jsd_repo;
-    
-    for(int i = 0; i < aThreads;i++){
-        pthread_create(&tids_a[i],NULL,analThread,&args_a);
-    }
-    for(int i = 0; i < aThreads; i++){
-        pthread_join(tids_a[i],NULL);
-    }
+        qsort(jsd_repo, compares, sizeof(jsd_t*), cmpArr);
 
-    qsort(jsd_repo, compares, sizeof(jsd_t*), cmpArr);
-
-    for(int i = 0; i < compares;i++){
-        printf("%f %s %s\n",jsd_repo[i]->jsd,jsd_repo[i]->file1->filePath,jsd_repo[i]->file2->filePath);
+        for(int i = 0; i < compares;i++){
+            printf("%f %s %s\n",jsd_repo[i]->jsd,jsd_repo[i]->file1->filePath,jsd_repo[i]->file2->filePath);
+        }
+        for(int i = 0; i < compares;i++){
+            free(jsd_repo[i]);
+        }
     }
 
     destroy(&dir);
@@ -249,10 +254,6 @@ int main(int argc, char* argv[]){
         root = root->next;
         free(temp1);
     }
-    for(int i = 0; i < compares;i++){
-        free(jsd_repo[i]);
-    }
-
         temp1 = NULL;
 
     if(compares < 1){

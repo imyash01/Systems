@@ -50,7 +50,7 @@ int cmpArr(const void* one, const void* two){
     return b - a;
 }
 int main(int argc, char* argv[]){
-    //int error = 0; CHECK sets error at the end
+    int error = 0; //CHECK sets error at the end
     int dThreads = 1;
     int fThreads = 1;
     int aThreads = 1;
@@ -127,12 +127,14 @@ int main(int argc, char* argv[]){
 
                     default:
                             write(2,"not a valid option", 20);
+                            error = 1;
                         break;
                 }
                 free(digit);
             }
             else{
                 write(2,"not a valid option", 20);
+                error = 1;
             }
         }
         else{
@@ -154,7 +156,8 @@ int main(int argc, char* argv[]){
                 enqueue(&file,argv[i]);
             }
             else{
-                //error bad path CHECK
+                write(2, "bad path\n",10);
+                error = 1;
             }
         }
     }
@@ -250,8 +253,8 @@ int main(int argc, char* argv[]){
 
     if(compares < 1){
         write(2, "not enough files\n",18);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     
-    return 0;
+    return error;
 }

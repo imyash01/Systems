@@ -50,6 +50,10 @@ int cmpArr(const void* one, const void* two){
     return b - a;
 }
 int main(int argc, char* argv[]){
+    if(argc < 1){
+        write(2, "no args\n",10);
+        return EXIT_FAILURE;
+    }
     int error = 0; //CHECK sets error at the end
     int dThreads = 1;
     int fThreads = 1;
@@ -83,7 +87,7 @@ int main(int argc, char* argv[]){
                                 digit[j - 2] = argv[i][j];
                             }
                             else{
-                                write(2,"not a number", 13);
+                                write(2,"not a number\n", 14);
                                 exit(1);
                             }
                         }
@@ -96,7 +100,7 @@ int main(int argc, char* argv[]){
                                 digit[j - 2] = argv[i][j];
                             }
                             else{
-                                write(2,"not a number", 13);
+                                write(2,"not a number\n", 14);
                                 exit(1);
                             }
                         }
@@ -109,7 +113,7 @@ int main(int argc, char* argv[]){
                                 digit[j - 2] = argv[i][j];
                             }
                             else{
-                                write(2,"not a number", 13);
+                                write(2,"not a number\n", 14);
                                 exit(1);
                             }
                         }
@@ -126,14 +130,14 @@ int main(int argc, char* argv[]){
                         break;
 
                     default:
-                            write(2,"not a valid option", 20);
+                            write(2,"not a valid option\n", 21);
                             error = 1;
                         break;
                 }
                 free(digit);
             }
             else{
-                write(2,"not a valid option", 20);
+                write(2,"not a valid option\n", 21);
                 error = 1;
             }
         }

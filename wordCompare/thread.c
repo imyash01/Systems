@@ -151,7 +151,7 @@ void* dirThread(void *A) //CHECK SUFFIX
                 //enqueue to the dir queue
             }
             else{
-                write(2,"The path is not dir or file",29);
+                write(2,"The path is not dir or file\n",30);
                 error = 1;
             }
             sb_destroy(&path);

@@ -14,4 +14,9 @@ We also tested some edge cases which include:
     - empty files/directories
     - failure to create threads
     - fewer than 2 files for analysis phase
+    - used more threads than files given
     - any word frequencies that are outside the range [0,1]
+
+To determine whether out program worked correctly we tested all these scnearios and
+we also used valgrind,UBSan,AddressSanitizer to check for any memory leaks and errors (e.g. any infinite
+loops, segmentation faults, undefined behaviour etc).

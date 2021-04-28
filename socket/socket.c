@@ -12,14 +12,17 @@
 
 typedef struct node_bst
 {
-   
     char* value;
     char* key;
     struct node_bst *left;
     struct node_bst *right;  
 } node_bst;
 
-
+typedef struct {
+    size_t length;
+    size_t used;
+    char *data;
+} strbuf_t;
 
 #define BACKLOG 5
 
@@ -30,13 +33,21 @@ struct connection {
     struct sockaddr_storage addr;
     socklen_t addr_len;
     int fd;
+    node_bst* root;
 };
+
+#ifndef DEBUG
+#define DEBUG 0
+#endif
 
 int server(char *port);
 void *echo(void *arg);
 node_bst* toAdd(char* value, char* key, node_bst* root);
 node_bst * makeNode(char* value, char* key);
-node_bst* findWord(node_bst * root, char * value, char* key);
+node_bst* findWord(node_bst * root, char* key);
+int sb_init(strbuf_t *L, size_t length);
+void sb_destroy(strbuf_t *L);
+int sb_append(strbuf_t *L, char letter);
 
 int main(int argc, char **argv)
 {
@@ -61,6 +72,7 @@ int server(char *port)
     struct connection *con;
     int error, sfd;
     pthread_t tid;
+    node_bst* root = NULL;
 
     // initialize hints
     memset(&hint, 0, sizeof(struct addrinfo));
@@ -149,6 +161,7 @@ int server(char *port)
             continue;
         }
         
+        con->root = root;
         // temporarily block SIGINT (child will inherit mask)
         error = pthread_sigmask(SIG_BLOCK, &mask, NULL);
         if (error != 0) {
@@ -212,6 +225,7 @@ void *echo(void *arg)
 
     while ((nread = read(c->fd, buf, BUFSIZE)) > 0) {
         buf[nread] = '\0';
+
         printf("[%s:%s] read %d bytes |%s|\n", host, port, nread, buf);
     }
 
@@ -222,15 +236,51 @@ void *echo(void *arg)
     return NULL;
 }
 
+int sb_init(strbuf_t *L, size_t length)
+{
+    L->data = malloc(sizeof(char) * length);
+    if (!L->data) return 1;
+
+    L->length = length;
+    L->used   = 1;
+    L->data[0] = '\0';
+
+    return 0;
+}
+
+void sb_destroy(strbuf_t *L)
+{
+    free(L->data);
+}
+
+
+int sb_append(strbuf_t *L, char letter)
+{
+    if (L->used == L->length) {
+	size_t size = L->length * 2;
+	char *p = realloc(L->data, sizeof(char) * size);
+	if (!p) return 1;
+
+	L->data = p;
+	L->length = size;
+
+	if (DEBUG) printf("Increased size to %lu\n", size);
+    }
+
+    L->data[L->used-1] = letter;
+    L->data[L->used] = '\0';
+    ++L->used;
+
+    return 0;
+}
+
 node_bst* toAdd(char* value, char* key, node_bst* root){
+    //mutex
     if(root ==  NULL){
-        //total++;//CHECK
         return makeNode(value, key);
     }
     int comp = strcmp(key,root->key);
     if(comp == 0){
-        //free(word);
-        //root->occurences ++;
         // already set, check for errors, user is trying to set key again
     }
     else if(comp < 0){
@@ -240,7 +290,9 @@ node_bst* toAdd(char* value, char* key, node_bst* root){
         root->right = toAdd(value, key, root->right);
     }
     return root;
+    //mutex
 }
+
 node_bst * makeNode(char* value, char* key){
     node_bst *newNode = malloc(sizeof(node_bst));
     char * temp = malloc(strlen(value) + 1);
@@ -259,14 +311,17 @@ node_bst * makeNode(char* value, char* key){
 
     return newNode;
 }
-node_bst* findWord(node_bst* root, char* value, char* key) {
+
+node_bst* findWord(node_bst* root, char* key) {
+    //mutex
     if(root == NULL || strcmp(key, root->key) == 0) { //return NULL
         return root;
     }
     else if(strcmp(key, root->key) < 0) { //if word we are searching for is less than current, search left
-        findWord(root->left, value, key);
+        findWord(root->left, key);
     }
     else {
-        findWord(root->right, value, key); //if word we are searching is greater, search right
+        findWord(root->right, key); //if word we are searching is greater, search right
     }
+    //mutex
 }

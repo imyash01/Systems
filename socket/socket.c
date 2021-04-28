@@ -8,6 +8,18 @@
 #include <netdb.h>
 #include <signal.h>
 #include <pthread.h>
+#include <time.h>
+
+typedef struct node_bst
+{
+   
+    char* value;
+    char* key;
+    struct node_bst *left;
+    struct node_bst *right;  
+} node_bst;
+
+
 
 #define BACKLOG 5
 
@@ -22,6 +34,9 @@ struct connection {
 
 int server(char *port);
 void *echo(void *arg);
+node_bst* toAdd(char* value, char* key, node_bst* root);
+node_bst * makeNode(char* value, char* key);
+node_bst* findWord(node_bst * root, char * value, char* key);
 
 int main(int argc, char **argv)
 {
@@ -205,4 +220,53 @@ void *echo(void *arg)
     close(c->fd);
     free(c);
     return NULL;
+}
+
+node_bst* toAdd(char* value, char* key, node_bst* root){
+    if(root ==  NULL){
+        //total++;//CHECK
+        return makeNode(value, key);
+    }
+    int comp = strcmp(key,root->key);
+    if(comp == 0){
+        //free(word);
+        //root->occurences ++;
+        // already set, check for errors, user is trying to set key again
+    }
+    else if(comp < 0){
+        root->left = toAdd(value, key, root->left);
+    }
+    else{
+        root->right = toAdd(value, key, root->right);
+    }
+    return root;
+}
+node_bst * makeNode(char* value, char* key){
+    node_bst *newNode = malloc(sizeof(node_bst));
+    char * temp = malloc(strlen(value) + 1);
+    char* temp1 = malloc(strlen(key) + 1);
+    if(newNode == NULL || temp == NULL || temp1 == NULL){
+        write(2, "malloc failed\n",15);
+        exit(1);
+    }
+    strcpy(temp, value);
+    strcpy(temp1, key);
+    newNode->value = temp;
+    newNode->key = temp1;
+    newNode->left = NULL;
+    newNode->right = NULL;
+
+
+    return newNode;
+}
+node_bst* findWord(node_bst* root, char* value, char* key) {
+    if(root == NULL || strcmp(key, root->key) == 0) { //return NULL
+        return root;
+    }
+    else if(strcmp(key, root->key) < 0) { //if word we are searching for is less than current, search left
+        findWord(root->left, value, key);
+    }
+    else {
+        findWord(root->right, value, key); //if word we are searching is greater, search right
+    }
 }

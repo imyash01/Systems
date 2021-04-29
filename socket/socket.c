@@ -8,6 +8,7 @@
 #include <netdb.h>
 #include <signal.h>
 #include <pthread.h>
+#include <ctype.h>
 #include <time.h>
 
 typedef struct node_bst
@@ -48,6 +49,9 @@ node_bst* findWord(node_bst * root, char* key);
 int sb_init(strbuf_t *L, size_t length);
 void sb_destroy(strbuf_t *L);
 int sb_append(strbuf_t *L, char letter);
+int sb_concat(strbuf_t* list, char* str);
+node_bst* minValueNode(node_bst* node);
+node_bst* deleteNode(node_bst* root, char* key);
 
 int main(int argc, char **argv)
 {
@@ -221,15 +225,87 @@ void *echo(void *arg)
         return NULL;
     }
 
-    printf("[%s:%s] connection\n", host, port);
+    strbuf_t code;
+    sb_init(&code,16);
+    strbuf_t sKey;
+    sb_init(&sKey,16);
+    int part = 0;
+    int bytes = 0;
+    char command = '\0';
+    //printf("[%s:%s] connection\n", host, port);
 
     while ((nread = read(c->fd, buf, BUFSIZE)) > 0) {
-        buf[nread] = '\0';
-
-        printf("[%s:%s] read %d bytes |%s|\n", host, port, nread, buf);
+        for(int i = 0; i < nread; i++){
+            if(buf[i] != '\n'){
+                sb_append(&code,buf[i]);
+            }
+            else{
+                part++;
+                if(part == 1){
+                    if(code.data[0] == 'S' && code.data[1] == 'E' && code.data[2] == 'T'){
+                        command = 's';
+                    }
+                    else if(code.data[0] == 'G' && code.data[1] == 'E' && code.data[2] == 'T'){
+                        command = 'g';
+                    }
+                    else if(code.data[0] == 'D' && code.data[1] == 'E' && code.data[2] == 'L'){
+                        command = 'd';
+                    }
+                    else{
+                        //error
+                    }
+                    sb_destroy(&code);
+                    sb_init(&code,16);
+                }
+                else if(part == 2){
+                    bytes = atoi(code.data);
+                    if(bytes == 0){
+                        //error
+                    }
+                    sb_destroy(&code);
+                    sb_init(&code,16);
+                }
+                else if(part == 3){
+                    if(command == 'g'){
+                        node_bst* temp;
+                        temp = findWord(c->root,code.data);
+                        printf("%s\n", temp->value);
+                    }
+                    else if(command == 'd'){
+                        node_bst* temp;
+                        temp = findWord(c->root,code.data);
+                        printf("%s\n", temp->value);
+                        deleteNode(c->root,code.data);
+                    }
+                    else if(command == 's'){
+                        sb_concat(&sKey,code.data);
+                    }
+                    else{
+                        //error
+                    }
+                    sb_destroy(&code);
+                    sb_init(&code,16);
+                }
+                else if(part == 4){
+                    if(command == 's'){
+                        c->root = toAdd(code.data,sKey.data,c->root);
+                        printf("OKS\n");
+                    }
+                    else{
+                        //error
+                    }
+                    sb_destroy(&code);
+                    sb_init(&code,16);
+                    sb_destroy(&sKey);
+                    sb_init(&sKey,16);
+                    part = 0;
+                }
+            }
+        }
+        
+        
     }
-
-    printf("[%s:%s] got EOF\n", host, port);
+    
 
     close(c->fd);
     free(c);
@@ -271,6 +347,17 @@ int sb_append(strbuf_t *L, char letter)
     L->data[L->used] = '\0';
     ++L->used;
 
+    return 0;
+}
+
+int sb_concat(strbuf_t* list, char* str){
+    int i = 0;
+    while(str[i] != '\0'){
+        if(sb_append(list, str[i])){
+            return 1;
+        }
+        i++;
+    }
     return 0;
 }
 
@@ -324,4 +411,50 @@ node_bst* findWord(node_bst* root, char* key) {
         findWord(root->right, key); //if word we are searching is greater, search right
     }
     //mutex
+}
+
+node_bst* minValueNode(node_bst* node)
+{
+    node_bst* current = node;
+ 
+    /* loop down to find the leftmost leaf */
+    while (current && current->left != NULL)
+        current = current->left;
+ 
+    return current;
+}
+
+node_bst* deleteNode(node_bst* root, char* key)
+{
+    // base case
+    if (root == NULL) // return error code???
+        return root;
+ 
+    int comp = strcmp(key,root->key);
+
+    if (comp < 0)
+        root->left = deleteNode(root->left, key);
+ 
+    else if (comp > 0)
+        root->right = deleteNode(root->right, key);
+ 
+    else {
+        // node with only one child or no child
+        if (root->left == NULL) {
+            node_bst* temp = root->right;
+            free(root);
+            return temp;
+        }
+        else if (root->right == NULL) {
+            node_bst* temp = root->left;
+            free(root);
+            return temp;
+        }
+ 
+        node_bst* temp = minValueNode(root->right);
+        root->key = temp->key;
+ 
+        root->right = deleteNode(root->right, temp->key);
+    }
+    return root;
 }

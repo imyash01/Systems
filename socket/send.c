@@ -74,7 +74,8 @@ int main(int argc, char **argv)
 	// send the remaining messages to the remote host
 	for (i = 3; i < argc; ++i) {
 		write(sock, argv[i], strlen(argv[i]));
-		sleep(5);
+		write(sock, "\n", 1);
+		//sleep(5);
 			// wait 50ms between writes, just to make things interesting
 	}
 	

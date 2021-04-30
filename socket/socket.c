@@ -25,6 +25,11 @@ typedef struct {
     char *data;
 } strbuf_t;
 
+typedef struct{
+    node_bst * root;
+    pthread_mutex_t lock;
+} BST;
+
 #define BACKLOG 5
 
 int running = 1;
@@ -34,8 +39,12 @@ struct connection {
     struct sockaddr_storage addr;
     socklen_t addr_len;
     int fd;
-    node_bst* root;
 };
+
+typedef struct args_t{
+    struct connection* con;
+    BST* bst;
+}args_t;
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -43,15 +52,19 @@ struct connection {
 
 int server(char *port);
 void *echo(void *arg);
+node_bst* toAddHelper(char* value, char* key, BST* root);
 node_bst* toAdd(char* value, char* key, node_bst* root);
 node_bst * makeNode(char* value, char* key);
+BST* makeBST();
 node_bst* findWord(node_bst * root, char* key);
 int sb_init(strbuf_t *L, size_t length);
 void sb_destroy(strbuf_t *L);
 int sb_append(strbuf_t *L, char letter);
 int sb_concat(strbuf_t* list, char* str);
 node_bst* minValueNode(node_bst* node);
+node_bst* deleteNodeHelper(BST* root, char* key);
 node_bst* deleteNode(node_bst* root, char* key);
+void toFree(node_bst *root);
 
 int main(int argc, char **argv)
 {
@@ -76,7 +89,9 @@ int server(char *port)
     struct connection *con;
     int error, sfd;
     pthread_t tid;
-    node_bst* root = NULL;
+    
+    args_t* args = malloc(sizeof(args_t));
+    args->bst = makeBST();
 
     // initialize hints
     memset(&hint, 0, sizeof(struct addrinfo));
@@ -165,7 +180,7 @@ int server(char *port)
             continue;
         }
         
-        con->root = root;
+        args->con = con;
         // temporarily block SIGINT (child will inherit mask)
         error = pthread_sigmask(SIG_BLOCK, &mask, NULL);
         if (error != 0) {
@@ -174,7 +189,7 @@ int server(char *port)
         }
 
 		// spin off a worker thread to handle the remote connection
-        error = pthread_create(&tid, NULL, echo, con);
+        error = pthread_create(&tid, NULL, echo, args);
 
 		// if we couldn't spin off the thread, clean up and wait for another connection
         if (error != 0) {
@@ -197,6 +212,11 @@ int server(char *port)
     }
 
 	puts("No longer listening.");
+    toFree(args->bst->root);
+    pthread_mutex_destroy(&(args->bst)->lock);
+    free(args->bst);
+    free(args);
+    free(con);
 	pthread_detach(pthread_self());
 	pthread_exit(NULL);
 
@@ -209,7 +229,10 @@ int server(char *port)
 void *echo(void *arg)
 {
     char host[100], port[10], buf[BUFSIZE + 1];
-    struct connection *c = (struct connection *) arg;
+    
+    args_t* args = (args_t *) arg;
+    struct connection *c = args->con;
+
     int error, nread;
 
 	// find out the name and port of the remote host
@@ -232,16 +255,26 @@ void *echo(void *arg)
     int part = 0;
     int bytes = 0;
     char command = '\0';
+    int currLen = 0;
     //printf("[%s:%s] connection\n", host, port);
 
     while ((nread = read(c->fd, buf, BUFSIZE)) > 0) {
         for(int i = 0; i < nread; i++){
+            currLen++;
             if(buf[i] != '\n'){
                 sb_append(&code,buf[i]);
             }
             else{
                 part++;
                 if(part == 1){
+                    if(code.used != 4){
+                        write(c->fd, "BAD\n", 4);
+                        write(1,"closing connection\n", 19);
+                        part = 0;
+                        //sb_destroy(&code);
+                        close(c->fd);
+                        break;
+                    }
                     if(code.data[0] == 'S' && code.data[1] == 'E' && code.data[2] == 'T'){
                         command = 's';
                     }
@@ -252,7 +285,12 @@ void *echo(void *arg)
                         command = 'd';
                     }
                     else{
-                        //error
+                        write(c->fd, "BAD\n", 4);
+                        write(1,"closing connection\n", 19);
+                        part = 0;
+                        //sb_destroy(&code);
+                        close(c->fd);
+                        break;
                     }
                     sb_destroy(&code);
                     sb_init(&code,16);
@@ -260,22 +298,63 @@ void *echo(void *arg)
                 else if(part == 2){
                     bytes = atoi(code.data);
                     if(bytes == 0){
-                        //error
+                        write(c->fd, "BAD\n", 4);
+                        write(1,"closing connection\n", 19);
+                        close(c->fd);
                     }
+                    currLen = 0;
                     sb_destroy(&code);
                     sb_init(&code,16);
                 }
-                else if(part == 3){
-                    if(command == 'g'){
+                else if(part == 3 && (currLen <= bytes)){
+                    if(currLen != bytes && command != 's'){
+                        write(c->fd, "LEN\n", 4);
+                        close(c->fd);
+                        break;
+                    }
+                    if(command == 'g'){ //CHECK what findWord returns if not found.
                         node_bst* temp;
-                        temp = findWord(c->root,code.data);
-                        printf("%s\n", temp->value);
+                        temp = findWord(args->bst->root,code.data);
+                        if(temp == NULL){
+                            write(c->fd, "KNF\n",4);
+                        }
+                        else{
+                            strbuf_t string;
+                            sb_init(&string,16);
+                            sb_concat(&string,"OKG\n");
+                            char num = (strlen(temp->value) + 1) + '0';
+                            sb_append(&string,num);
+                            sb_append(&string, '\n');
+                            sb_concat(&string,temp->value);
+                            sb_append(&string,'\n');
+                            
+                            write(c->fd, string.data,string.used - 1);
+                            sb_destroy(&string);
+                        }
+                        part = 0;
+                        //printf("%s\n", temp->value);
                     }
                     else if(command == 'd'){
                         node_bst* temp;
-                        temp = findWord(c->root,code.data);
-                        printf("%s\n", temp->value);
-                        deleteNode(c->root,code.data);
+                        temp = findWord(args->bst->root,code.data);
+                        if(temp == NULL){
+                            write(c->fd, "KNF\n",4);
+                        }
+                        else{
+                            strbuf_t string;
+                            sb_init(&string,16);
+                            sb_concat(&string,"OKD\n");
+                            char num = (strlen(temp->value) + 1) + '0';
+                            sb_append(&string,num);
+                            sb_append(&string, '\n');
+                            sb_concat(&string,temp->value);
+                            sb_append(&string,'\n');
+                            
+                            write(c->fd, string.data,string.used - 1);
+                            sb_destroy(&string);
+                            args->bst->root = deleteNodeHelper(args->bst,code.data);
+                        }
+                        part = 0;
                     }
                     else if(command == 's'){
                         sb_concat(&sKey,code.data);
@@ -286,10 +365,10 @@ void *echo(void *arg)
                     sb_destroy(&code);
                     sb_init(&code,16);
                 }
-                else if(part == 4){
+                else if(part == 4 && (currLen == bytes)){
                     if(command == 's'){
-                        c->root = toAdd(code.data,sKey.data,c->root);
-                        printf("OKS\n");
+                        args->bst->root = toAddHelper(code.data,sKey.data,args->bst);
+                        write(c->fd, "OKS\n", 4);
                     }
                     else{
                         //error
@@ -300,14 +379,20 @@ void *echo(void *arg)
                     sb_init(&sKey,16);
                     part = 0;
                 }
+                else{
+                    write(c->fd, "LEN\n", 4);
+                    close(c->fd);
+                    break;
+                }
             }
+            
         }
-        
-        
     }
+    sb_destroy(&code);
+    sb_destroy(&sKey);
     
 
-    close(c->fd);
+    //close(c->fd);
     free(c);
     return NULL;
 }
@@ -361,6 +446,14 @@ int sb_concat(strbuf_t* list, char* str){
     return 0;
 }
 
+node_bst* toAddHelper(char* value, char* key, BST* root){ // to do recursion and mutex stuff
+    pthread_mutex_lock(&root->lock);
+    node_bst* temp;
+    temp = toAdd(value,key,root->root);
+    pthread_mutex_unlock(&root->lock);
+    return temp;
+}
+
 node_bst* toAdd(char* value, char* key, node_bst* root){
     //mutex
     if(root ==  NULL){
@@ -399,6 +492,13 @@ node_bst * makeNode(char* value, char* key){
     return newNode;
 }
 
+BST* makeBST(){
+    BST* bst = malloc(sizeof(BST));
+    bst->root = NULL;
+    pthread_mutex_init(&bst->lock, NULL);
+    return bst;
+}
+
 node_bst* findWord(node_bst* root, char* key) {
     //mutex
     if(root == NULL || strcmp(key, root->key) == 0) { //return NULL
@@ -424,6 +524,14 @@ node_bst* minValueNode(node_bst* node)
     return current;
 }
 
+node_bst* deleteNodeHelper(BST* root, char* key){ //to do recursion and have mutex
+    pthread_mutex_lock(&root->lock);
+    node_bst * temp;
+    temp =  deleteNode(root->root, key);
+    pthread_mutex_unlock(&root->lock);
+    return temp;
+}
+
 node_bst* deleteNode(node_bst* root, char* key)
 {
     // base case
@@ -442,11 +550,15 @@ node_bst* deleteNode(node_bst* root, char* key)
         // node with only one child or no child
         if (root->left == NULL) {
             node_bst* temp = root->right;
+            free(root->key);
+            free(root->value);
             free(root);
             return temp;
         }
         else if (root->right == NULL) {
             node_bst* temp = root->left;
+            free(root->key);
+            free(root->value);
             free(root);
             return temp;
         }
@@ -457,4 +569,15 @@ node_bst* deleteNode(node_bst* root, char* key)
         root->right = deleteNode(root->right, temp->key);
     }
     return root;
+}
+
+void toFree(node_bst *root){
+    if(root == NULL){
+        return;
+    }
+    toFree(root->left);
+    toFree(root->right);
+    free(root->key);
+    free(root->value);
+    free(root);
 }

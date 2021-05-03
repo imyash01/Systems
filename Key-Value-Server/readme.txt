@@ -11,7 +11,12 @@ GET function to receive those values from the keys and testing our DEL function 
 The data structure we used to store all the values was a BST (it was easier to store in alphabetical order). 
 
 Some of the edge cases we tested: 
-    - If user tries to GET an unknwon key, we return an key-not-found error
-    - If user tries to DEL an unknown key, we also return a key-not-found error
+    - If user tries to GET an unset key, we return an key-not-found error
+    - If user tries to DEL an unset key, we also return a key-not-found error
     - Error messages (e.x BAD, LEN), server closes when any errors are reached in error cases
-    - If first byte in a message is X, report error immediately
+    - If first command in a message is not GET,SET or DEL, we report error immediately and close connection
+    - Checked with multiple connection to see if we are getting any non deterministic behavior due to multiple threads
+
+To determine whether out program worked correctly we tested all these scnearios and
+we also used valgrind,AddressSanitizer to check for any memory leaks and errors (e.g. any infinite
+loops, segmentation faults, undefined behaviour etc).

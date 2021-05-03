@@ -312,6 +312,12 @@ void *echo(void *arg)
                         close(c->fd);
                         break;
                     }
+                    if(code.used < 2){
+                        write(c->fd, "BAD\n", 4);
+                        write(1,"closing connection\n", 19);
+                        close(c->fd);
+                        break;
+                    }
                     if(command == 'g'){ //CHECK what findWord returns if not found.
                         node_bst* temp;
                         temp = findWord(args->bst->root,code.data);
@@ -360,18 +366,30 @@ void *echo(void *arg)
                         sb_concat(&sKey,code.data);
                     }
                     else{
-                        //error
+                        write(c->fd, "BAD\n", 4);
+                        write(1,"closing connection\n", 19);
+                        close(c->fd);
+                        break;
                     }
                     sb_destroy(&code);
                     sb_init(&code,16);
                 }
                 else if(part == 4 && (currLen == bytes)){
+                    if(code.used < 2){
+                        write(c->fd, "BAD\n", 4);
+                        write(1,"closing connection\n", 19);
+                        close(c->fd);
+                        break;
+                    }
                     if(command == 's'){
                         args->bst->root = toAddHelper(code.data,sKey.data,args->bst);
                         write(c->fd, "OKS\n", 4);
                     }
                     else{
-                        //error
+                        write(c->fd, "BAD\n", 4);
+                        write(1,"closing connection\n", 19);
+                        close(c->fd);
+                        break;
                     }
                     sb_destroy(&code);
                     sb_init(&code,16);
@@ -392,7 +410,7 @@ void *echo(void *arg)
     sb_destroy(&sKey);
     
 
-    //close(c->fd);
+    close(c->fd);
     free(c);
     return NULL;
 }
@@ -455,13 +473,15 @@ node_bst* toAddHelper(char* value, char* key, BST* root){ // to do recursion and
 }
 
 node_bst* toAdd(char* value, char* key, node_bst* root){
-    //mutex
     if(root ==  NULL){
         return makeNode(value, key);
     }
     int comp = strcmp(key,root->key);
     if(comp == 0){
-        // already set, check for errors, user is trying to set key again
+        free(root->value);
+        char* temp = malloc(strlen(value) + 1);
+        strcpy(temp,value);
+        root->value = temp;
     }
     else if(comp < 0){
         root->left = toAdd(value, key, root->left);
@@ -470,7 +490,6 @@ node_bst* toAdd(char* value, char* key, node_bst* root){
         root->right = toAdd(value, key, root->right);
     }
     return root;
-    //mutex
 }
 
 node_bst * makeNode(char* value, char* key){
@@ -500,7 +519,6 @@ BST* makeBST(){
 }
 
 node_bst* findWord(node_bst* root, char* key) {
-    //mutex
     if(root == NULL || strcmp(key, root->key) == 0) { //return NULL
         return root;
     }
@@ -510,7 +528,6 @@ node_bst* findWord(node_bst* root, char* key) {
     else {
         findWord(root->right, key); //if word we are searching is greater, search right
     }
-    //mutex
 }
 
 node_bst* minValueNode(node_bst* node)
